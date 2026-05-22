@@ -138,7 +138,7 @@
                                 <span class="action-label">OVERDRIVE</span>
                             </div>
                             <div class="control-item">
-                                <div class="keycap">P</div>
+                                <div class="keycap">Esc</div>
                                 <span class="action-label">PAUSE</span>
                             </div>
                         </div>
@@ -146,10 +146,14 @@
 
                     <button id="start-btn" class="cyber-btn main-action">
                         <span class="btn-glitch"></span>
-                        <span class="btn-text">INITIATE DRIVE SEQUENCE</span>
+                        <span class="btn-text">START</span>
                     </button>
                     
                     <div id="high-score-start" class="high-score-display text-magenta">BEST_DRIVE: 000000</div>
+                    
+                    <div class="mobile-hint-new">
+                        <span class="action-label">MOBILE: TOUCH EDGES TO STEER // AUTO-ACCEL ON</span>
+                    </div>
                 </div>
             </section>
 
@@ -165,7 +169,6 @@
             <!-- GAME OVER SCREEN: Shown when the player crashes -->
             <section id="game-over-screen" class="screen crash-state hidden">
                 <div class="menu-content">
-                    <div class="warning-banner">CRITICAL_SYSTEM_FAILURE</div>
                     <h1 class="glitch-text text-red" data-text="SIGNAL LOST">SIGNAL LOST</h1>
                     
                     <div class="stats-panel-modern">
@@ -179,11 +182,10 @@
                         </div>
                     </div>
 
-                    <div class="reboot-hint">
-                        <span class="keycap small">ENTER</span> <span class="action-label">REBOOT_SYSTEM</span>
-                    </div>
+
 
                     <button id="restart-btn" class="cyber-btn danger-btn">RE-INITIALIZE</button>
+                    <div class="small-text">Press enter to continue</div>
                 </div>
             </section>
         </div>

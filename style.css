@@ -3,45 +3,37 @@
    ============================================================ */
 
 /* 1. GLOBAL VARIABLES (Custom Properties)
-   Centralized variables for easy theme management and consistency.
-   These are accessible throughout the CSS via var(--variable-name). */
+   Centralized variables for easy theme management and consistency. */
 :root {
-    /* Core Neon Palette */
     --cyan: #00f3ff;
     --magenta: #bc13fe;
     --yellow: #fffa00;
     --red: #ff0033;
     
-    /* Backgrounds and Overlays */
     --bg-dark: #020205;
     --glass: rgba(0, 0, 0, 0.25);
     --glass-heavy: rgba(0, 0, 0, 0.65);
     
-    /* Neon Glow Presets */
     --cyan-glow: 0 0 15px var(--cyan);
     --magenta-glow: 0 0 15px var(--magenta);
     --red-glow: 0 0 15px var(--red);
     
-    /* Layout Constants */
     --blur-ui: blur(10px);
     --blur-heavy: blur(20px);
     --border-ui: 1px solid rgba(0, 243, 255, 0.2);
     
-    /* Typography */
     --font-heading: 'Orbitron', sans-serif;
     --font-ui: 'Rajdhani', sans-serif;
     
-    /* Animations */
     --trans-fast: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     --trans-med: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 2. BASE STYLES
-   Global reset and fundamental body styles. */
+/* 2. BASE STYLES */
 * {
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
-    user-select: none; /* Prevents text selection during intense gameplay */
+    user-select: none;
 }
 
 body {
@@ -50,15 +42,14 @@ body {
     background: var(--bg-dark);
     color: white;
     font-family: var(--font-ui);
-    overflow: hidden; /* Prevents scrolling */
+    overflow: hidden;
     height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
-/* 3. AMBIENT BACKGROUND ENVIRONMENT
-   Decorative layers that create the cyberpunk atmosphere. */
+/* 3. AMBIENT BACKGROUND */
 #desktop-bg {
     position: fixed;
     inset: 0;
@@ -66,7 +57,6 @@ body {
     background: linear-gradient(to bottom, #000, #050510);
 }
 
-/* Scrolling neon grid on the 'floor' */
 .cyber-grid {
     position: absolute;
     bottom: -50%;
@@ -79,7 +69,7 @@ body {
     background-size: 50px 50px;
     transform: perspective(500px) rotateX(60deg);
     animation: gridMove 20s linear infinite;
-    will-change: transform; /* Hint to the browser for GPU acceleration */
+    will-change: transform;
 }
 
 @keyframes gridMove {
@@ -87,7 +77,6 @@ body {
     100% { background-position: 0 1000px; }
 }
 
-/* Diffused neon lights in the background */
 .ambient-light {
     position: absolute;
     width: 600px;
@@ -99,36 +88,36 @@ body {
 .ambient-light.left { top: 0; left: -100px; background: var(--magenta); }
 .ambient-light.right { bottom: 0; right: -100px; background: var(--cyan); }
 
-/* Darkens the edges of the screen for focus */
 .vignette {
     position: absolute;
     inset: 0;
     background: radial-gradient(circle, transparent 40%, #000 120%);
 }
 
-/* 4. GAME VIEWPORT WRAPPER
-   Main container for the canvas and all overlays. */
+/* 4. GAME VIEWPORT */
 #app-wrapper {
     position: relative;
     z-index: 10;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
+    overflow: hidden;
 }
 
 #game-container {
     position: relative;
-    width: 1200px;
-    height: 1500px;
+    width: min(1200px, 95vw);
+    height: min(1500px, 95vh);
     aspect-ratio: 4 / 5;
     background: #000;
     box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
     border: var(--border-ui);
     overflow: hidden;
     z-index: 5;
-    transition: filter var(--trans-med); /* Used for the screen-switch blur effect */
+    transition: filter var(--trans-med);
+    margin: auto; /* Fallback centering */
 }
 
 canvas {
@@ -140,8 +129,7 @@ canvas {
     will-change: contents;
 }
 
-/* 5. CINEMATIC EFFECTS LAYER
-   Overlays that add TV-style noise or damage effects. */
+/* 5. CINEMATIC EFFECTS */
 .scanlines {
     position: fixed;
     inset: 0;
@@ -164,13 +152,12 @@ canvas {
     transition: opacity 0.1s;
 }
 
-/* 6. HUD ELEMENTS
-   Live gameplay information displayed over the canvas. */
+/* 6. HUD ELEMENTS */
 #hud-overlay {
     position: absolute;
     inset: 0;
     padding: 30px;
-    pointer-events: none; /* Allows mouse clicks to pass through to the canvas if needed */
+    pointer-events: none;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -184,7 +171,6 @@ canvas {
     position: relative;
 }
 
-/* Glass-effect stat boxes */
 .stat-box {
     background: var(--glass);
     backdrop-filter: var(--blur-ui);
@@ -207,7 +193,6 @@ canvas {
     font-weight: 900;
 }
 
-/* Interactive pause icon */
 .pause-trigger {
     position: absolute;
     top: 0;
@@ -239,7 +224,6 @@ canvas {
     align-items: flex-end;
 }
 
-/* Reusable module styling for speedometer and nitro */
 .module {
     background: var(--glass);
     backdrop-filter: var(--blur-ui);
@@ -247,7 +231,7 @@ canvas {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* --- SPEEDOMETER GAUGE --- */
+/* SPEEDOMETER */
 .speed-module-new {
     width: 180px;
     height: 180px;
@@ -267,7 +251,7 @@ canvas {
 .speed-gauge-svg {
     width: 100%;
     height: 100%;
-    transform: rotate(135deg); /* Aligns the start of the arc to the bottom-left */
+    transform: rotate(135deg);
 }
 
 .gauge-track {
@@ -280,8 +264,8 @@ canvas {
     fill: none;
     stroke: var(--cyan);
     stroke-width: 8;
-    stroke-dasharray: 339; /* Matches the circumference of the circle */
-    stroke-dashoffset: 339; /* Hidden by default */
+    stroke-dasharray: 339;
+    stroke-dashoffset: 339;
     stroke-linecap: round;
     filter: drop-shadow(0 0 8px var(--cyan));
     transform-origin: center;
@@ -303,10 +287,10 @@ canvas {
     color: var(--cyan);
     line-height: 1;
     text-shadow: 0 0 15px var(--cyan);
-    font-variant-numeric: tabular-nums; /* Prevents numbers from shifting left/right during count */
+    font-variant-numeric: tabular-nums;
 }
 
-/* --- NITRO STYLES --- */
+/* NITRO */
 .nitro-module {
     align-self: flex-end;
     padding: 20px 30px;
@@ -351,8 +335,7 @@ canvas {
     to { opacity: 1; transform: scale(1.1); box-shadow: 0 0 20px var(--magenta); }
 }
 
-/* 7. MENU SCREENS
-   Full-screen overlays for UI states. */
+/* 7. MENU SCREENS */
 .screen {
     position: absolute;
     inset: 0;
@@ -370,9 +353,10 @@ canvas {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 40px;
+    gap: clamp(10px, 2.5vh, 25px);
     width: 100%;
-    max-width: 700px;
+    max-width: 600px;
+    padding: 10px;
     animation: menuFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -383,31 +367,44 @@ canvas {
 
 h1 {
     font-family: var(--font-heading);
-    font-size: 96px;
+    font-size: clamp(32px, 8vh, 72px);
     margin: 0;
-    letter-spacing: 15px;
+    letter-spacing: clamp(5px, 1.5vw, 10px);
     font-weight: 900;
-    line-height: 1;
+    line-height: 1.1;
 }
 
-/* --- MODERN INSTRUCTIONS (Keycaps) --- */
+.subtitle {
+    letter-spacing: 4px;
+    color: var(--cyan);
+    opacity: 0.7;
+    margin: -10px 0 0 0;
+    font-size: 12px;
+}
+
+/* MODERN INSTRUCTIONS */
 .modern-instructions {
     display: flex;
     flex-direction: column;
-    gap: 30px;
+    gap: clamp(8px, 1.5vh, 15px);
 }
 
 .control-row {
     display: flex;
     justify-content: center;
-    gap: 50px;
+    gap: clamp(20px, 4vw, 40px);
 }
 
 .control-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
+}
+
+.keycap-group {
+    display: flex;
+    gap: 6px;
 }
 
 .keycap {
@@ -415,42 +412,45 @@ h1 {
     color: var(--cyan);
     border: 2px solid var(--cyan);
     border-radius: 8px;
-    width: 50px;
-    height: 50px;
+    width: clamp(34px, 4.5vh, 44px);
+    height: clamp(34px, 4.5vh, 44px);
     display: flex;
     justify-content: center;
     align-items: center;
     font-family: var(--font-heading);
     font-weight: 900;
-    font-size: 20px;
+    font-size: clamp(12px, 2vh, 18px);
     box-shadow: 0 0 10px rgba(0, 243, 255, 0.3), inset 0 0 5px rgba(0, 243, 255, 0.2);
 }
 
-.keycap.wide { width: 100px; }
+.keycap.wide { width: clamp(65px, 9vh, 90px); }
 .keycap.small { width: 75px; height: 35px; font-size: 12px; }
 
 .action-label {
-    font-size: 11px;
+    font-size: 10px;
     letter-spacing: 2px;
     color: rgba(255, 255, 255, 0.5);
     text-transform: uppercase;
     font-weight: 700;
 }
 
-/* --- CYBER BUTTONS --- */
+/* CYBER BUTTONS */
 .cyber-btn {
     background: transparent;
     border: 2px solid var(--cyan);
     color: var(--cyan);
-    padding: 22px 60px;
+    padding: clamp(12px, 1.8vh, 20px) clamp(30px, 5vw, 60px);
     font-family: var(--font-heading);
     font-weight: 900;
     cursor: pointer;
     transition: var(--trans-med);
     letter-spacing: 5px;
     text-transform: uppercase;
-    font-size: 20px;
+    font-size: clamp(14px, 2.2vh, 20px);
+    pointer-events: auto;
 }
+
+.cyber-btn span { pointer-events: none; }
 
 .cyber-btn:hover {
     background: var(--cyan);
@@ -459,91 +459,57 @@ h1 {
     transform: scale(1.05);
 }
 
-.main-action {
-    border-width: 3px;
-    animation: btnPulse 2s infinite;
-}
+.main-action { border-width: 3px; animation: btnPulse 2s infinite; }
 
 @keyframes btnPulse {
     0% { box-shadow: 0 0 10px var(--cyan); }
-    50% { box-shadow: 0 0 40px var(--cyan); }
+    50% { box-shadow: 0 0 30px var(--cyan); }
     100% { box-shadow: 0 0 10px var(--cyan); }
 }
 
-/* 8. GLITCH TEXT EFFECT
-   Simulates a flickering digital signal. */
-.glitch-text {
-    position: relative;
+/* 8. GLITCH TEXT EFFECT */
+.glitch-text { position: relative; }
+.glitch-text::before, .glitch-text::after {
+    content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.8;
 }
-
-.glitch-text::before,
-.glitch-text::after {
-    content: attr(data-text);
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    opacity: 0.8;
-}
-
-.glitch-text::before {
-    color: var(--cyan);
-    z-index: -1;
-    animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
-}
-
-.glitch-text::after {
-    color: var(--magenta);
-    z-index: -2;
-    animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) reverse both infinite;
-}
+.glitch-text::before { color: var(--cyan); z-index: -1; animation: glitch 2s cubic-bezier(.25, .46, .45, .94) both infinite; }
+.glitch-text::after { color: var(--magenta); z-index: -2; animation: glitch 2s cubic-bezier(.25, .46, .45, .94) reverse both infinite; }
 
 @keyframes glitch {
     0% { transform: translate(0); }
-    20% { transform: translate(-3px, 3px); }
-    40% { transform: translate(-3px, -3px); }
-    60% { transform: translate(3px, 3px); }
-    80% { transform: translate(3px, -3px); }
+    5% { transform: translate(-3px, 3px); }
+    10% { transform: translate(-3px, -3px); }
+    15% { transform: translate(3px, 3px); }
+    20% { transform: translate(3px, -3px); }
+    25% { transform: translate(0); }
     100% { transform: translate(0); }
 }
 
-/* 9. CRASH STATE & GAME OVER REFINEMENT */
+/* 9. CRASH STATE */
 .crash-state { background: radial-gradient(circle, rgba(255, 0, 51, 0.4) 0%, #000 100%); }
-
-.warning-banner {
-    background: var(--red);
-    color: white;
-    width: 100%;
-    padding: 12px;
-    font-weight: 900;
-    animation: blink 0.2s infinite;
-    letter-spacing: 5px;
-}
 
 @keyframes blink { 0% { opacity: 0; } 100% { opacity: 1; } }
 
-.stats-panel-modern {
-    display: flex;
-    gap: 25px;
-}
+.stats-panel-modern { display: flex; gap: 25px; }
+.stat-module { background: var(--glass-heavy); border: 1px solid rgba(255, 255, 255, 0.1); padding: 20px 40px; min-width: 200px; }
 
-.stat-module {
-    background: var(--glass-heavy);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 20px 40px;
-    min-width: 200px;
-}
+.mobile-hint-new { margin-top: 10px; }
 
-/* 10. UTILITY CLASSES
-   Helpers for standard neon colors and text glows. */
+/* 10. UTILITIES */
 .text-cyan { color: var(--cyan); text-shadow: var(--cyan-glow); }
 .text-magenta { color: var(--magenta); text-shadow: var(--magenta-glow); }
 .text-red { color: var(--red); text-shadow: var(--red-glow); }
 .hidden { display: none !important; }
 
-/* --- NITRO OVERDRIVE SCREEN EFFECT --- */
+/* NITRO OVERDRIVE EFFECT */
 .nitro-active { animation: chromaticAberration 0.1s infinite; }
 
 @keyframes chromaticAberration {
     0% { filter: drop-shadow(2px 0px 0px rgba(255,0,255,0.5)) drop-shadow(-2px 0px 0px rgba(0,255,255,0.5)); }
     50% { filter: drop-shadow(-1px 1px 0px rgba(255,0,255,0.5)) drop-shadow(1px -1px 0px rgba(0,255,255,0.5)); }
     100% { filter: drop-shadow(1px 0px 0px rgba(255,0,255,0.5)) drop-shadow(-1px 0px 0px rgba(0,255,255,0.5)); }
+}
+
+@media (max-width: 768px) {
+    .modern-instructions { display: none; }
 }
