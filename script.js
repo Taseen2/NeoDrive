@@ -291,7 +291,10 @@
             bind('pause-btn-hud', () => this.togglePause()); bind('resume-btn', () => this.togglePause());
             window.addEventListener('keydown', e => {
                 if (e.code === 'KeyP' || e.code === 'Escape') this.togglePause();
-                if ((e.code === 'Enter' || e.code === 'NumpadEnter') && (this.state === STATE.START || this.state === STATE.GAMEOVER)) this.start();
+                if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+                    if (this.state === STATE.START || this.state === STATE.GAMEOVER) this.start();
+                    if (this.state === STATE.PAUSED) this.togglePause();
+                }
             });
             this.ui.switchState(STATE.START, { highScore: this.highScore });
             requestAnimationFrame(t => this.loop(t));
