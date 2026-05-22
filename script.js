@@ -107,6 +107,31 @@
         }
     };
 
+    const GAUGE_CONFIG = {
+        NEEDLE_SMOOTHING: 8,
+        PULSE_THRESHOLD: 0.8,    // 80% of max speed
+        VIBRATE_THRESHOLD: 0.95, // 95% of max speed
+        VIBRATE_INTENSITY: 2,
+        COLOR_TRANSITION_SPEED: 5
+    };
+
+    const VISUAL_CONFIG = {
+        PLAYER: {
+            GLOW_STRENGTH: 25,
+            UNDERGLOW_PULSE: 0.1,
+            STEER_TILT_MAX: 12,
+            TILT_SMOOTHING: 10,
+            EXHAUST_FLICKER: 0.15,
+            TRAIL_MAX: 12,
+            SPEED_GLOW_FACTOR: 1.5
+        },
+        SPARKS: {
+            COUNT: 10,
+            SPEED: 15,
+            COLOR: '#fffa00'
+        }
+    };
+
     const PLAYER_CONFIG = {
         WIDTH: 70,
         HEIGHT: 110,
@@ -284,6 +309,11 @@
             this.flashOverlay = document.getElementById('flash-overlay');
 
             this.cache = { score: -1, combo: -1, speed: -1, nitro: -1, nitroReady: false };
+            this.internal = {
+                needlePercent: 0,
+                displaySpeed: 0,
+                gaugeColor: CONFIG.COLORS.CYAN
+            };
         }
 
         update(speed, nitro, score, combo, maxSpeed, dt, isNitroActive) {
@@ -297,18 +327,44 @@
             const container = document.getElementById('game-container');
             if (container) container.classList.toggle('nitro-active', !!isNitroActive);
 
-            const rs = Math.round((speed / 1000) * CONFIG.GAUGE.DISPLAY_MAX_SPEED);
-            if (this.cache.speed !== rs) {
-                if (this.speedNum) this.speedNum.textContent = rs;
-                if (this.speedGaugeFill) {
-                    const circumference = CONFIG.GAUGE.CIRCUMFERENCE;
-                    const maxArc = CONFIG.GAUGE.MAX_ARC;
-                    const fillPercent = Math.min(speed / CONFIG.GAUGE.GAUGE_MAX_SPEED, 1.25);
-                    const offset = circumference - (fillPercent * maxArc);
-                    this.speedGaugeFill.style.strokeDashoffset = offset;
-                    this.speedGaugeFill.style.stroke = speed > PLAYER_CONFIG.NORMAL_MAX_SPEED ? CONFIG.COLORS.RED : CONFIG.COLORS.CYAN;
+            // 1. Smooth Speed Interpolation
+            const targetRs = Math.round((speed / 1000) * CONFIG.GAUGE.DISPLAY_MAX_SPEED);
+            this.internal.displaySpeed = lerp(this.internal.displaySpeed, targetRs, dt * GAUGE_CONFIG.NEEDLE_SMOOTHING);
+            const displaySpeedInt = Math.round(this.internal.displaySpeed);
+
+            if (this.cache.speed !== displaySpeedInt) {
+                if (this.speedNum) this.speedNum.textContent = displaySpeedInt;
+                this.cache.speed = displaySpeedInt;
+            }
+
+            // 2. Gauge Visuals & Vibration
+            if (this.speedGaugeFill) {
+                const targetPercent = Math.min(speed / CONFIG.GAUGE.GAUGE_MAX_SPEED, 1.25);
+                this.internal.needlePercent = lerp(this.internal.needlePercent, targetPercent, dt * GAUGE_CONFIG.NEEDLE_SMOOTHING);
+                
+                const circumference = CONFIG.GAUGE.CIRCUMFERENCE;
+                const maxArc = CONFIG.GAUGE.MAX_ARC;
+                const offset = circumference - (this.internal.needlePercent * maxArc);
+                
+                // Vibrate at high speeds
+                let vibration = 0;
+                if (targetPercent > GAUGE_CONFIG.VIBRATE_THRESHOLD) {
+                    vibration = (Math.random() - 0.5) * GAUGE_CONFIG.VIBRATE_INTENSITY;
                 }
-                this.cache.speed = rs;
+
+                this.speedGaugeFill.style.strokeDashoffset = offset;
+                this.speedGaugeFill.style.transform = `rotate(${vibration}deg)`;
+                
+                // Color Transition
+                const targetColor = speed > PLAYER_CONFIG.NORMAL_MAX_SPEED ? CONFIG.COLORS.RED : CONFIG.COLORS.CYAN;
+                this.speedGaugeFill.style.stroke = targetColor;
+                
+                // Pulse effect
+                if (targetPercent > GAUGE_CONFIG.PULSE_THRESHOLD) {
+                    this.speedGaugeFill.style.filter = `drop-shadow(0 0 ${10 + Math.sin(Date.now() / 50) * 5}px ${targetColor})`;
+                } else {
+                    this.speedGaugeFill.style.filter = 'none';
+                }
             }
 
             const n = Math.floor(nitro);
@@ -479,7 +535,15 @@
             this.cameraScale = 1.0;
             this.lastTime = 0;
 
-            this.player = { x: VIEW.WIDTH / 2, speed: 0, nitroActive: false, trail: [] };
+            this.player = { 
+                x: VIEW.WIDTH / 2, 
+                speed: 0, 
+                nitroActive: false, 
+                trail: [],
+                tilt: 0,
+                glowIntensity: 0,
+                underglowPulse: 0
+            };
             this.trafficPool = Array.from({ length: TRAFFIC_CONFIG.POOL_SIZE }, () => new TrafficCar());
             this.spawnTimer = 0;
 
@@ -610,6 +674,14 @@
             if (this.input.isPressed('KeyA') || this.input.isPressed('ArrowLeft')) this.player.x -= PLAYER_CONFIG.TURN_SPEED * turnFactor * dt;
             if (this.input.isPressed('KeyD') || this.input.isPressed('ArrowRight')) this.player.x += PLAYER_CONFIG.TURN_SPEED * turnFactor * dt;
 
+            const targetTilt = (this.input.isPressed('KeyA') || this.input.isPressed('ArrowLeft')) ? -VISUAL_CONFIG.PLAYER.STEER_TILT_MAX : 
+                               (this.input.isPressed('KeyD') || this.input.isPressed('ArrowRight')) ? VISUAL_CONFIG.PLAYER.STEER_TILT_MAX : 0;
+            this.player.tilt = lerp(this.player.tilt, targetTilt, dt * VISUAL_CONFIG.PLAYER.TILT_SMOOTHING);
+            
+            this.player.underglowPulse += dt * 5;
+            const speedRatio = this.player.speed / PLAYER_CONFIG.MAX_SPEED;
+            this.player.glowIntensity = (speedRatio * VISUAL_CONFIG.PLAYER.SPEED_GLOW_FACTOR) + (this.player.nitroActive ? 1.5 : 1.0);
+
             const margin = CONFIG.ROAD_MARGIN + CONFIG.ROAD_SAFETY_MARGIN;
             this.player.x = Math.max(margin, Math.min(this.player.x, VIEW.WIDTH - margin));
 
@@ -661,6 +733,7 @@
                 }
 
                 if (dx < CONFIG.COLLISION.CRASH.WIDTH && dy < CONFIG.COLLISION.CRASH.HEIGHT) {
+                    this.particles.spawn(px, py, VISUAL_CONFIG.SPARKS.COLOR, VISUAL_CONFIG.SPARKS.COUNT, VISUAL_CONFIG.SPARKS.SPEED);
                     this.ui.triggerFlash();
                     this.audio.playCrash();
                     this.hitstop = CONFIG.COLLISION.CRASH.HITSTOP;

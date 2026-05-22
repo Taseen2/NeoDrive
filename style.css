@@ -273,7 +273,8 @@ canvas {
     stroke-dashoffset: 339;
     stroke-linecap: round;
     filter: drop-shadow(0 0 8px var(--cyan));
-    transition: stroke-dashoffset 0.1s ease-out, stroke 0.3s;
+    transform-origin: center;
+    transition: stroke 0.3s;
 }
 
 .redline-arc {
@@ -301,6 +302,7 @@ canvas {
     color: var(--cyan);
     line-height: 1;
     text-shadow: 0 0 15px var(--cyan);
+    font-variant-numeric: tabular-nums;
 }
 
 .unit {
