@@ -26,12 +26,54 @@
         PHYSICS_STEP: 1 / 120,
         ROAD_SAFETY_MARGIN: 50,
         SCORE_SCALING: 10,
+        GAUGE: {
+            CIRCUMFERENCE: 339,
+            MAX_ARC: 255,
+            DISPLAY_MAX_SPEED: 320,
+            GAUGE_MAX_SPEED: 800
+        },
+        GRID: {
+            SPACING: 100,
+            LINE_WIDTH: 2
+        },
+        PARTICLES: {
+            DEFAULT_COUNT: 15,
+            DEFAULT_SPEED: 10,
+            DECAY_RATE: 2.5,
+            SIZE: 4
+        },
+        AUDIO: {
+            ENGINE: {
+                BASE_FREQ: 45,
+                SPEED_FREQ_SCALE: 150,
+                NITRO_FREQ_BOOST: 80,
+                BASE_VOL: 0.04,
+                SPEED_VOL_SCALE: 0.1,
+                NITRO_VOL_BOOST: 0.06,
+                LPF_FREQ: 500
+            },
+            CRASH: {
+                DURATION: 0.4,
+                VOL: 0.25,
+                DECAY_VOL: 0.01
+            },
+            NEAR_MISS: {
+                FREQ_START: 800,
+                FREQ_END: 1200,
+                VOL: 0.1,
+                DECAY_VOL: 0.01,
+                DURATION: 0.1
+            }
+        },
         COLORS: {
             CYAN: '#00f3ff',
             MAGENTA: '#bc13fe',
             YELLOW: '#fffa00',
             RED: '#ff0033',
-            PLAYER: '#ff0033'
+            PLAYER: '#ff0033',
+            ROAD_BASE: '#111',
+            LANE_LINE: 'rgba(255,255,255,0.1)',
+            NITRO_LINE: 'rgba(188, 19, 254, 0.4)'
         },
         COLLISION: {
             NEAR_MISS: {
@@ -60,7 +102,8 @@
         LANE_SWITCH: {
             INTENSITY_THRESHOLD: 0.5,
             CHANCE: 0.5,      // Chance per second
-            COOLDOWN: 2.0     // Seconds between switches
+            COOLDOWN: 2.0,    // Seconds between switches
+            ACTIVE_RANGE: { MIN: -200, MAX: 800 }
         }
     };
 
@@ -78,7 +121,11 @@
         NITRO_REGEN: 12,
         TURN_SPEED: 600,
         MIN_SPEED_FOR_TURN: 200,
-        MAX_NITRO: 100
+        MAX_NITRO: 100,
+        SHAKE: {
+            BASE: 2,
+            NITRO: 6
+        }
     };
 
     const TRAFFIC_CONFIG = {
@@ -119,12 +166,12 @@
                 this.gain = this.ctx.createGain();
 
                 this.osc.type = 'sawtooth';
-                this.osc.frequency.setValueAtTime(45, this.ctx.currentTime);
+                this.osc.frequency.setValueAtTime(CONFIG.AUDIO.ENGINE.BASE_FREQ, this.ctx.currentTime);
                 this.gain.gain.setValueAtTime(0, this.ctx.currentTime);
 
                 const lpf = this.ctx.createBiquadFilter();
                 lpf.type = 'lowpass';
-                lpf.frequency.setValueAtTime(500, this.ctx.currentTime);
+                lpf.frequency.setValueAtTime(CONFIG.AUDIO.ENGINE.LPF_FREQ, this.ctx.currentTime);
 
                 this.osc.connect(lpf);
                 lpf.connect(this.gain);
@@ -139,9 +186,9 @@
 
         update(speedRatio, isNitro) {
             if (!this.initialized) return;
-            const freq = 45 + (speedRatio * 150) + (isNitro ? 80 : 0);
+            const freq = CONFIG.AUDIO.ENGINE.BASE_FREQ + (speedRatio * CONFIG.AUDIO.ENGINE.SPEED_FREQ_SCALE) + (isNitro ? CONFIG.AUDIO.ENGINE.NITRO_FREQ_BOOST : 0);
             this.osc.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.1);
-            const volume = 0.04 + (speedRatio * 0.1) + (isNitro ? 0.06 : 0);
+            const volume = CONFIG.AUDIO.ENGINE.BASE_VOL + (speedRatio * CONFIG.AUDIO.ENGINE.SPEED_VOL_SCALE) + (isNitro ? CONFIG.AUDIO.ENGINE.NITRO_VOL_BOOST : 0);
             this.gain.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.1);
         }
 
@@ -153,14 +200,14 @@
         playCrash() {
             if (!this.initialized) return;
             const n = this.ctx.createBufferSource();
-            const b = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.4, this.ctx.sampleRate);
+            const b = this.ctx.createBuffer(1, this.ctx.sampleRate * CONFIG.AUDIO.CRASH.DURATION, this.ctx.sampleRate);
             const d = b.getChannelData(0);
             for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
             n.buffer = b;
 
             const g = this.ctx.createGain();
-            g.gain.setValueAtTime(0.25, this.ctx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+            g.gain.setValueAtTime(CONFIG.AUDIO.CRASH.VOL, this.ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(CONFIG.AUDIO.CRASH.DECAY_VOL, this.ctx.currentTime + CONFIG.AUDIO.CRASH.DURATION);
 
             n.connect(g);
             g.connect(this.ctx.destination);
@@ -172,14 +219,14 @@
             const o = this.ctx.createOscillator();
             const g = this.ctx.createGain();
             o.type = 'square';
-            o.frequency.setValueAtTime(800, this.ctx.currentTime);
-            o.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
-            g.gain.setValueAtTime(0.1, this.ctx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+            o.frequency.setValueAtTime(CONFIG.AUDIO.NEAR_MISS.FREQ_START, this.ctx.currentTime);
+            o.frequency.exponentialRampToValueAtTime(CONFIG.AUDIO.NEAR_MISS.FREQ_END, this.ctx.currentTime + CONFIG.AUDIO.NEAR_MISS.DURATION);
+            g.gain.setValueAtTime(CONFIG.AUDIO.NEAR_MISS.VOL, this.ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(CONFIG.AUDIO.NEAR_MISS.DECAY_VOL, this.ctx.currentTime + CONFIG.AUDIO.NEAR_MISS.DURATION);
             o.connect(g);
             g.connect(this.ctx.destination);
             o.start();
-            o.stop(this.ctx.currentTime + 0.1);
+            o.stop(this.ctx.currentTime + CONFIG.AUDIO.NEAR_MISS.DURATION);
         }
     }
 
@@ -247,16 +294,16 @@
                 this.cache.score = s;
             }
 
-            const rs = Math.round((speed / 1000) * 320); // Scale to 320 KM/H
+            const rs = Math.round((speed / 1000) * CONFIG.GAUGE.DISPLAY_MAX_SPEED);
             if (this.cache.speed !== rs) {
                 if (this.speedNum) this.speedNum.textContent = rs;
                 if (this.speedGaugeFill) {
-                    const circumference = 339;
-                    const maxArc = 255;
-                    const fillPercent = Math.min(speed / 800, 1.25); // Use base max speed for gauge
+                    const circumference = CONFIG.GAUGE.CIRCUMFERENCE;
+                    const maxArc = CONFIG.GAUGE.MAX_ARC;
+                    const fillPercent = Math.min(speed / CONFIG.GAUGE.GAUGE_MAX_SPEED, 1.25);
                     const offset = circumference - (fillPercent * maxArc);
                     this.speedGaugeFill.style.strokeDashoffset = offset;
-                    this.speedGaugeFill.style.stroke = speed > 800 ? CONFIG.COLORS.RED : CONFIG.COLORS.CYAN;
+                    this.speedGaugeFill.style.stroke = speed > PLAYER_CONFIG.NORMAL_MAX_SPEED ? CONFIG.COLORS.RED : CONFIG.COLORS.CYAN;
                 }
                 this.cache.speed = rs;
             }
@@ -324,7 +371,7 @@
 
     class ParticleSystem {
         constructor() { this.particles = []; }
-        spawn(x, y, color, count = 15, speed = 10) {
+        spawn(x, y, color, count = CONFIG.PARTICLES.DEFAULT_COUNT, speed = CONFIG.PARTICLES.DEFAULT_SPEED) {
             for (let i = 0; i < count; i++) {
                 this.particles.push({ x, y, vx: (Math.random() - 0.5) * speed, vy: (Math.random() - 0.5) * speed, life: 1.0, color });
             }
@@ -332,7 +379,7 @@
         update(dt) {
             for (let i = this.particles.length - 1; i >= 0; i--) {
                 const p = this.particles[i];
-                p.x += p.vx; p.y += p.vy; p.life -= dt * 2.5;
+                p.x += p.vx; p.y += p.vy; p.life -= dt * CONFIG.PARTICLES.DECAY_RATE;
                 if (p.life <= 0) this.particles.splice(i, 1);
             }
         }
@@ -340,7 +387,7 @@
             this.particles.forEach(p => {
                 ctx.globalAlpha = p.life;
                 ctx.fillStyle = p.color;
-                ctx.fillRect(p.x, p.y, 4, 4);
+                ctx.fillRect(p.x, p.y, CONFIG.PARTICLES.SIZE, CONFIG.PARTICLES.SIZE);
             });
             ctx.globalAlpha = 1;
         }
@@ -358,7 +405,7 @@
             this.logicalY = TRAFFIC_CONFIG.INITIAL_Y;
             this.x = undefined; // Will be initialized on first update or spawn
             this.speed = TRAFFIC_CONFIG.BASE_SPEED_MIN + Math.random() * TRAFFIC_CONFIG.BASE_SPEED_VAR;
-            this.color = TRAFFIC_CONFIG.COLORS[Math.floor(Math.random() * 4)];
+            this.color = TRAFFIC_CONFIG.COLORS[Math.floor(Math.random() * TRAFFIC_CONFIG.COLORS.length)];
             this.active = false;
             this.missed = false;
             this.switchCooldown = 0;
@@ -388,7 +435,7 @@
             // Lane Switching Logic
             if (difficulty > DIFFICULTY_CONFIG.LANE_SWITCH.INTENSITY_THRESHOLD) {
                 this.switchCooldown -= dt;
-                if (this.switchCooldown <= 0 && this.logicalY < 800 && this.logicalY > -200) {
+                if (this.switchCooldown <= 0 && this.logicalY < DIFFICULTY_CONFIG.LANE_SWITCH.ACTIVE_RANGE.MAX && this.logicalY > DIFFICULTY_CONFIG.LANE_SWITCH.ACTIVE_RANGE.MIN) {
                     if (Math.random() < DIFFICULTY_CONFIG.LANE_SWITCH.CHANCE * dt) {
                         const playerLane = Math.floor((playerX - marginX) / CONFIG.LANE_WIDTH);
                         if (playerLane !== this.lane) {
@@ -427,7 +474,7 @@
             this.offset = 0;
             this.shake = 0;
             this.hitstop = 0;
-            this.nitro = 100;
+            this.nitro = PLAYER_CONFIG.MAX_NITRO;
             this.crashTimer = null;
             this.highScore = this.loadHighScore();
 
@@ -501,7 +548,7 @@
             this.state = STATE.PLAYING;
             this.score = 0;
             this.combo = 1;
-            this.nitro = 100;
+            this.nitro = PLAYER_CONFIG.MAX_NITRO;
             this.player.x = VIEW.WIDTH / 2;
             this.player.speed = 0;
             this.player.nitroActive = false;
@@ -528,18 +575,17 @@
 
             this.player.nitroActive = false;
             if ((this.input.isPressed('ShiftLeft') || this.input.isPressed('ShiftRight')) && this.nitro > 0 && isMoving) {
-                this.nitro -= 40 * dt;
+                this.nitro -= PLAYER_CONFIG.NITRO_CONSUMPTION * dt;
                 this.player.nitroActive = true;
             } else {
-                this.nitro = Math.min(100, this.nitro + 12 * dt);
+                this.nitro = Math.min(PLAYER_CONFIG.MAX_NITRO, this.nitro + PLAYER_CONFIG.NITRO_REGEN * dt);
             }
 
-            const PHYSICS_STEP = 1 / 120;
             let remaining = dt;
             const maxSpeed = PLAYER_CONFIG.MAX_SPEED * (1 + difficulty * (DIFFICULTY_CONFIG.SPEED_SCALING_FACTOR - 1));
 
             while (remaining > 0) {
-                const step = Math.min(remaining, PHYSICS_STEP);
+                const step = Math.min(remaining, CONFIG.PHYSICS_STEP);
                 if (isBraking) {
                     this.player.speed = Math.max(0, this.player.speed - PLAYER_CONFIG.BRAKE_FORCE * step);
                 } else if (isMoving) {
@@ -551,11 +597,11 @@
                 remaining -= step;
             }
 
-            const turnFactor = Math.min(this.player.speed / 200, 1.0);
+            const turnFactor = Math.min(this.player.speed / PLAYER_CONFIG.MIN_SPEED_FOR_TURN, 1.0);
             if (this.input.isPressed('KeyA') || this.input.isPressed('ArrowLeft')) this.player.x -= PLAYER_CONFIG.TURN_SPEED * turnFactor * dt;
             if (this.input.isPressed('KeyD') || this.input.isPressed('ArrowRight')) this.player.x += PLAYER_CONFIG.TURN_SPEED * turnFactor * dt;
 
-            const margin = CONFIG.ROAD_MARGIN + 50;
+            const margin = CONFIG.ROAD_MARGIN + CONFIG.ROAD_SAFETY_MARGIN;
             this.player.x = Math.max(margin, Math.min(this.player.x, VIEW.WIDTH - margin));
 
             this.offset += this.player.speed * dt;
@@ -569,10 +615,10 @@
             }
             this.trafficPool.forEach(c => c.update(dt, this.player.speed, difficulty, this.player.x));
 
-            if (this.player.speed > 10) this.score += (this.player.speed * dt) / 10;
+            if (this.player.speed > 10) this.score += (this.player.speed * dt) / CONFIG.SCORE_SCALING;
             this.checkCollisions();
 
-            this.shake = (this.player.speed / PLAYER_CONFIG.MAX_SPEED) * 2 + (this.player.nitroActive ? 6 : 0);
+            this.shake = (this.player.speed / PLAYER_CONFIG.MAX_SPEED) * PLAYER_CONFIG.SHAKE.BASE + (this.player.nitroActive ? PLAYER_CONFIG.SHAKE.NITRO : 0);
             this.ui.update(this.player.speed, this.nitro, this.score, this.combo, PLAYER_CONFIG.NORMAL_MAX_SPEED, dt);
             this.audio.update(this.player.speed / PLAYER_CONFIG.MAX_SPEED, this.player.nitroActive);
         }
@@ -591,12 +637,12 @@
 
                 if (dx < CONFIG.COLLISION.NEAR_MISS.WIDTH && dy < CONFIG.COLLISION.NEAR_MISS.HEIGHT && !c.missed) {
                     if (dx >= CONFIG.COLLISION.NEAR_MISS.THRESHOLD) {
-                        this.score += 500 * this.combo;
+                        this.score += CONFIG.COLLISION.NEAR_MISS.SCORE_BASE * this.combo;
                         this.combo++;
                         this.ui.showNearMiss();
                         this.audio.playNearMiss();
                         c.missed = true;
-                        this.nitro = Math.min(100, this.nitro + CONFIG.COLLISION.NEAR_MISS.NITRO_REWARD);
+                        this.nitro = Math.min(PLAYER_CONFIG.MAX_NITRO, this.nitro + CONFIG.COLLISION.NEAR_MISS.NITRO_REWARD);
                     }
                 }
 
@@ -604,7 +650,7 @@
                     this.ui.triggerFlash();
                     this.audio.playCrash();
                     this.hitstop = CONFIG.COLLISION.CRASH.HITSTOP;
-                    this.particles.spawn(px, py, CONFIG.COLORS.RED, CONFIG.COLLISION.CRASH.PARTICLE_COUNT, 15);
+                    this.particles.spawn(px, py, CONFIG.COLORS.RED, CONFIG.COLLISION.CRASH.PARTICLE_COUNT, CONFIG.COLLISION.CRASH.PARTICLE_SPEED);
                     this.saveHighScore(this.score);
                     this.crashTimer = setTimeout(() => {
                         if (this.state === STATE.PLAYING) {
@@ -624,7 +670,7 @@
             if (this.shake > 0) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
 
             // Road
-            ctx.fillStyle = '#111';
+            ctx.fillStyle = CONFIG.COLORS.ROAD_BASE;
             ctx.fillRect(0, 0, VIEW.WIDTH, VIEW.HEIGHT);
             const marginX = CONFIG.ROAD_MARGIN;
             ctx.fillStyle = CONFIG.ROAD_COLOR;
@@ -632,9 +678,9 @@
 
             // Grid
             ctx.strokeStyle = CONFIG.GRID_COLOR;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = CONFIG.GRID.LINE_WIDTH;
             for (let i = -1; i <= 10; i++) {
-                const y = (i * 100 + (this.offset % 100));
+                const y = (i * CONFIG.GRID.SPACING + (this.offset % CONFIG.GRID.SPACING));
                 ctx.beginPath();
                 ctx.moveTo(marginX, y); ctx.lineTo(VIEW.WIDTH - marginX, y); ctx.stroke();
             }
@@ -643,14 +689,14 @@
             for (let i = 0; i <= CONFIG.LANE_COUNT; i++) {
                 const x = marginX + i * CONFIG.LANE_WIDTH;
                 ctx.beginPath();
-                ctx.strokeStyle = (i === 0 || i === CONFIG.LANE_COUNT) ? CONFIG.COLORS.CYAN : 'rgba(255,255,255,0.1)';
+                ctx.strokeStyle = (i === 0 || i === CONFIG.LANE_COUNT) ? CONFIG.COLORS.CYAN : CONFIG.COLORS.LANE_LINE;
                 ctx.lineWidth = (i === 0 || i === CONFIG.LANE_COUNT) ? 4 : 2;
                 ctx.moveTo(x, 0); ctx.lineTo(x, VIEW.HEIGHT); ctx.stroke();
             }
 
             // Nitro Speed Lines
             if (this.player.nitroActive) {
-                ctx.strokeStyle = 'rgba(188, 19, 254, 0.4)';
+                ctx.strokeStyle = CONFIG.COLORS.NITRO_LINE;
                 ctx.lineWidth = 2;
                 for (let i = 0; i < 20; i++) {
                     const x = Math.random() * VIEW.WIDTH;
