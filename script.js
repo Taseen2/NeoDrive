@@ -23,12 +23,32 @@
         LANE_WIDTH: 150,
         ROAD_COLOR: '#080808',
         GRID_COLOR: 'rgba(0, 243, 255, 0.15)',
+        PHYSICS_STEP: 1 / 120,
+        ROAD_SAFETY_MARGIN: 50,
+        SCORE_SCALING: 10,
         COLORS: {
             CYAN: '#00f3ff',
             MAGENTA: '#bc13fe',
             YELLOW: '#fffa00',
             RED: '#ff0033',
             PLAYER: '#ff0033'
+        },
+        COLLISION: {
+            NEAR_MISS: {
+                WIDTH: 90,
+                HEIGHT: 95,
+                THRESHOLD: 55,
+                NITRO_REWARD: 20,
+                SCORE_BASE: 500
+            },
+            CRASH: {
+                WIDTH: 50,
+                HEIGHT: 80,
+                HITSTOP: 300,
+                PARTICLE_COUNT: 30,
+                PARTICLE_SPEED: 15,
+                DEATH_DELAY: 300
+            }
         },
         get ROAD_MARGIN() { return (VIEW.WIDTH - (this.LANE_COUNT * this.LANE_WIDTH)) / 2; }
     };
@@ -54,7 +74,10 @@
         BRAKE_FORCE: 1200,   // NEW: Sharp braking
         FRICTION: 150,       // NEW: Constant passive deceleration
         NITRO_ACCEL: 600,    // NEW: Linear nitro boost
+        NITRO_CONSUMPTION: 40,
+        NITRO_REGEN: 12,
         TURN_SPEED: 600,
+        MIN_SPEED_FOR_TURN: 200,
         MAX_NITRO: 100
     };
 
@@ -62,7 +85,13 @@
         WIDTH: 65,
         HEIGHT: 110,
         COLORS: ['#00f3ff', '#ff00ff', '#00ff00', '#ffff00'],
-        POOL_SIZE: 10
+        POOL_SIZE: 10,
+        INITIAL_Y: -250,
+        DESPAWN_Y_BOTTOM: 1200,
+        DESPAWN_Y_TOP: -600,
+        X_SMOOTHING: 5,
+        BASE_SPEED_MIN: 120,
+        BASE_SPEED_VAR: 180
     };
 
     function lerp(start, end, amt) {
@@ -560,22 +589,22 @@
                 const dx = Math.abs(px - cx);
                 const dy = Math.abs(py - cy);
 
-                if (dx < 90 && dy < 95 && !c.missed) {
-                    if (dx >= 55) {
+                if (dx < CONFIG.COLLISION.NEAR_MISS.WIDTH && dy < CONFIG.COLLISION.NEAR_MISS.HEIGHT && !c.missed) {
+                    if (dx >= CONFIG.COLLISION.NEAR_MISS.THRESHOLD) {
                         this.score += 500 * this.combo;
                         this.combo++;
                         this.ui.showNearMiss();
                         this.audio.playNearMiss();
                         c.missed = true;
-                        this.nitro = Math.min(100, this.nitro + 20);
+                        this.nitro = Math.min(100, this.nitro + CONFIG.COLLISION.NEAR_MISS.NITRO_REWARD);
                     }
                 }
 
-                if (dx < 50 && dy < 80) {
+                if (dx < CONFIG.COLLISION.CRASH.WIDTH && dy < CONFIG.COLLISION.CRASH.HEIGHT) {
                     this.ui.triggerFlash();
                     this.audio.playCrash();
-                    this.hitstop = 300;
-                    this.particles.spawn(px, py, CONFIG.COLORS.RED, 30, 15);
+                    this.hitstop = CONFIG.COLLISION.CRASH.HITSTOP;
+                    this.particles.spawn(px, py, CONFIG.COLORS.RED, CONFIG.COLLISION.CRASH.PARTICLE_COUNT, 15);
                     this.saveHighScore(this.score);
                     this.crashTimer = setTimeout(() => {
                         if (this.state === STATE.PLAYING) {
@@ -583,7 +612,7 @@
                             this.ui.switchState(STATE.GAMEOVER, { score: this.score, highScore: this.highScore });
                             this.audio.stop();
                         }
-                    }, 300);
+                    }, CONFIG.COLLISION.CRASH.DEATH_DELAY);
                 }
             }
         }
