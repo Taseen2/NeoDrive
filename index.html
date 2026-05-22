@@ -84,51 +84,81 @@
 
             <!-- SCREENS -->
             <div id="start-screen" class="screen">
-                <div class="title-container">
+                <div class="menu-content">
                     <h1 class="glitch-text" data-text="NEO DRIVE">NEO DRIVE</h1>
-                    <p class="subtitle">SIMULATION v3.0</p>
-                </div>
-                <div class="instructions">
-                    <div class="instruction-row">
-                        <span class="key">W</span> <span class="action">ACCEL</span>
-                        <span class="key">S</span> <span class="action">BRAKE</span>
+                    <p class="subtitle">v3.0 // NEURAL_LINK_READY</p>
+                    
+                    <div class="modern-instructions">
+                        <div class="control-row">
+                            <div class="control-item">
+                                <div class="keycap">W</div>
+                                <span class="action-label">THRUST</span>
+                            </div>
+                            <div class="control-item">
+                                <div class="keycap">S</div>
+                                <span class="action-label">BRAKE</span>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-item">
+                                <div class="keycap-group">
+                                    <div class="keycap">A</div>
+                                    <div class="keycap">D</div>
+                                </div>
+                                <span class="action-label">STEERING</span>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-item">
+                                <div class="keycap wide">SHIFT</div>
+                                <span class="action-label">OVERDRIVE</span>
+                            </div>
+                            <div class="control-item">
+                                <div class="keycap">P</div>
+                                <span class="action-label">PAUSE</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="instruction-row">
-                        <span class="key">A</span> <span class="key">D</span> <span class="action">STEER</span>
-                        <span class="key">SHIFT</span> <span class="action">NITRO</span>
-                    </div>
-                    <div class="instruction-row">
-                        <span class="key">P</span> <span class="action">PAUSE</span>
-                        <span class="key">ENTER</span> <span class="action">RESTART</span>
-                    </div>
-                    <div class="mobile-instructions">
-                        <p class="mobile-hint">TOUCH EDGES TO STEER • BOOST/BRAKE BUTTONS</p>
-                    </div>
+
+                    <button id="start-btn" class="cyber-btn main-action">
+                        <span class="btn-glitch"></span>
+                        <span class="btn-text">INITIATE DRIVE SEQUENCE</span>
+                    </button>
+                    
                     <div id="high-score-start" class="high-score-display text-magenta">BEST_DRIVE: 000000</div>
                 </div>
-                <button id="start-btn" class="cyber-btn">INITIATE DRIVE SEQUENCE</button>
             </div>
 
             <div id="pause-screen" class="screen hidden">
-                <h1 class="glitch-text text-cyan" data-text="PAUSED">PAUSED</h1>
-                <p class="subtitle">SYSTEM STANDBY...</p>
-                <button id="resume-btn" class="cyber-btn">RESUME SEQUENCE</button>
+                <div class="menu-content">
+                    <h1 class="glitch-text text-cyan" data-text="PAUSED">PAUSED</h1>
+                    <p class="subtitle">SYSTEM STANDBY...</p>
+                    <button id="resume-btn" class="cyber-btn">RESUME SEQUENCE</button>
+                </div>
             </div>
 
             <div id="game-over-screen" class="screen crash-state hidden">
-                <h1 class="glitch-text text-red" data-text="VEHICLE DESTROYED">VEHICLE DESTROYED</h1>
-                <p class="signal-lost">SIGNAL LOST...</p>
-                <div class="stats-panel">
-                    <div class="stat-row">
-                        <span class="stat-label">FINAL SCORE</span>
-                        <span id="final-score" class="stat-val text-cyan">0</span>
+                <div class="menu-content">
+                    <div class="warning-banner">CRITICAL_SYSTEM_FAILURE</div>
+                    <h1 class="glitch-text text-red" data-text="SIGNAL LOST">SIGNAL LOST</h1>
+                    
+                    <div class="stats-panel-modern">
+                        <div class="stat-module">
+                            <span class="label">YIELD</span>
+                            <span id="final-score" class="value text-cyan">000000</span>
+                        </div>
+                        <div class="stat-module">
+                            <span class="label">RECORD</span>
+                            <span id="high-score-end" class="value text-magenta">000000</span>
+                        </div>
                     </div>
-                    <div class="stat-row">
-                        <span class="stat-label">BEST DRIVE</span>
-                        <span id="high-score-end" class="stat-val text-magenta">0</span>
+
+                    <div class="reboot-hint">
+                        <span class="keycap small">ENTER</span> <span class="action-label">REBOOT_SYSTEM</span>
                     </div>
+
+                    <button id="restart-btn" class="cyber-btn danger-btn">RE-INITIALIZE</button>
                 </div>
-                <button id="restart-btn" class="cyber-btn danger-btn">REBOOT SYSTEM</button>
             </div>
         </div>
     </div>

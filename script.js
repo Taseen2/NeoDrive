@@ -398,6 +398,13 @@
         }
 
         switchState(state, data = {}) {
+            // Apply transition effects
+            const container = document.getElementById('game-container');
+            if (container) {
+                container.style.filter = 'blur(10px) brightness(0.5)';
+                setTimeout(() => container.style.filter = 'none', 400);
+            }
+
             Object.values(this.screens).forEach(s => { if (s) s.classList.add('hidden'); });
             const mobileControls = document.getElementById('mobile-controls');
             const mobileOnly = document.getElementById('mobile-only-controls');
@@ -415,7 +422,8 @@
                 if (this.screens.pause) this.screens.pause.classList.remove('hidden');
             } else if (state === STATE.GAMEOVER) {
                 if (this.screens.gameOver) this.screens.gameOver.classList.remove('hidden');
-                if (document.getElementById('final-score')) document.getElementById('final-score').textContent = Math.floor(data.score).toString().padStart(6, '0');
+                const finalScoreEl = document.getElementById('final-score');
+                if (finalScoreEl) finalScoreEl.textContent = Math.floor(data.score).toString().padStart(6, '0');
                 if (this.highScoreEnd) this.highScoreEnd.textContent = data.highScore.toString().padStart(6, '0');
                 if (mobileControls) mobileControls.classList.add('hidden');
                 if (mobileOnly) mobileOnly.classList.add('hidden');
