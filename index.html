@@ -2,15 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">  
+    <!-- Sets the viewport to ensure the game scales correctly on mobile devices and prevents unwanted zooming -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Neo Drive Simulation</title>
+    
+    <!-- External Fonts: Orbitron for headings and Rajdhani for UI elements -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- Link to our modern neon theme styles -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- BACKGROUND -->
+    <!-- ==========================
+         DECORATIVE BACKGROUND
+         ========================== -->
+    <!-- These elements are purely visual and do not interact with the player -->
     <div id="desktop-bg" aria-hidden="true">
         <div class="cyber-grid"></div>
         <div class="ambient-light left"></div>
@@ -18,28 +26,35 @@
         <div class="vignette"></div>
     </div>
 
-    <!-- MAIN APP WRAPPER -->
+    <!-- ==========================
+         PRIMARY GAME INTERFACE
+         ========================== -->
     <main id="app-wrapper">
-        <!-- PUTTING OVERLAYS BACK OUTSIDE CONTAINER FOR DIRECT SELECTABILITY -->
-        <div class="scanlines"></div>
-        <div id="flash-overlay"></div>
+        <!-- Cinematic overlays like scanlines and damage flashes -->
+        <div class="scanlines" aria-hidden="true"></div>
+        <div id="flash-overlay" aria-hidden="true"></div>
 
         <div id="game-container">
-            <!-- THE CANVAS: RESTORED TO PRIMARY POSITION -->
-            <canvas id="gameCanvas" width="800" height="1000" aria-label="NeoDrive racing game canvas"></canvas>
+            <!-- The Canvas: This is where the game world and cars are actually drawn -->
+            <canvas id="gameCanvas" aria-label="NeoDrive racing game canvas"></canvas>
             
-            <!-- HUD OVERLAY -->
+            <!-- ==========================
+                 HUD (Heads-Up Display)
+                 ========================== -->
+            <!-- Contains live stats like score, speed, and nitro levels -->
             <div id="hud-overlay" class="hidden">
                 <header class="hud-top">
+                    <!-- Current Score Display -->
                     <div class="stat-box">
                         <span class="label">SYS_SCORE</span>
                         <span id="score-val" class="value text-cyan">000000</span>
                     </div>
+                    <!-- Combo Multiplier: Only shown when you perform near misses -->
                     <div id="combo-container" class="stat-box hidden">
                         <span class="label">COMBO_MULTIPLIER</span>
                         <span id="combo-val" class="value text-magenta">x1</span>
                     </div>
-                    <!-- PAUSE BUTTON -->
+                    <!-- Pause Trigger: Allows the player to pause the game via mouse/touch -->
                     <button id="pause-btn-hud" class="pause-trigger" title="Pause Game">
                         <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
                             <rect x="6" y="4" width="4" height="16" />
@@ -49,6 +64,7 @@
                 </header>
 
                 <footer class="hud-bottom">
+                    <!-- Speedometer Module: Shows current velocity with a circular gauge -->
                     <div class="module speed-module-new">
                         <div class="gauge-wrapper">
                             <svg class="speed-gauge-svg" viewBox="0 0 120 120">
@@ -63,31 +79,39 @@
                         </div>
                     </div>
 
+                    <!-- Nitro Module: Displays remaining boost capacity -->
                     <div class="module nitro-module">
                         <div class="val-row label-row">
                             <span class="label">N2O_CORE</span>
                             <span id="nitro-status" class="status-ready hidden">READY</span>
                         </div>
-                        <div class="bar-bg"><div id="nitro-bar" class="bar-fill magenta-bg"></div></div>
+                        <div class="bar-bg">
+                            <div id="nitro-bar" class="bar-fill magenta-bg"></div>
+                        </div>
                     </div>
                 </footer>
                 
-                <!-- TOUCH CONTROLS -->
-                <div id="mobile-controls" class="hidden">
+                <!-- Floating pop-up text for gameplay rewards -->
+                <div id="near-miss-pop" class="floating-text hidden">NEAR MISS +BOOST</div>
+
+                <!-- Touch Controls: Only visible on mobile devices -->
+                <nav id="mobile-controls" class="hidden">
                     <div id="touch-left" class="touch-zone"></div>
                     <div id="touch-right" class="touch-zone"></div>
                     <button id="nitro-btn" class="touch-btn-nitro">BOOST</button>
-                </div>
-
-                <div id="near-miss-pop" class="floating-text hidden">NEAR MISS +BOOST</div>
+                </nav>
             </div>
 
-            <!-- SCREENS -->
+            <!-- ==========================
+                 MENU SCREENS
+                 ========================== -->
+            <!-- START SCREEN: The first thing the player sees -->
             <section id="start-screen" class="screen">
                 <div class="menu-content">
                     <h1 class="glitch-text" data-text="NEO DRIVE">NEO DRIVE</h1>
-                    <p class="subtitle">v3.0 // NEURAL_LINK_READY</p>
+                    <p class="subtitle">v4.0 // NEURAL_LINK_READY</p>
                     
+                    <!-- Visual Keycap Controls: Shows the player how to drive -->
                     <div class="modern-instructions">
                         <div class="control-row">
                             <div class="control-item">
@@ -129,6 +153,7 @@
                 </div>
             </section>
 
+            <!-- PAUSE SCREEN: Shown when the game is paused -->
             <section id="pause-screen" class="screen hidden">
                 <div class="menu-content">
                     <h1 class="glitch-text text-cyan" data-text="PAUSED">PAUSED</h1>
@@ -137,6 +162,7 @@
                 </div>
             </section>
 
+            <!-- GAME OVER SCREEN: Shown when the player crashes -->
             <section id="game-over-screen" class="screen crash-state hidden">
                 <div class="menu-content">
                     <div class="warning-banner">CRITICAL_SYSTEM_FAILURE</div>
@@ -162,10 +188,13 @@
             </section>
         </div>
     </main>
-    <!-- ADDING BRAKE BTN TO HUD OVERLAY FOR MOBILE -->
+
+    <!-- Mobile-only brake button located in a separate layer for ergonomics -->
     <div id="mobile-only-controls" class="hidden">
         <button id="brake-btn" class="touch-btn-brake">BRAKE</button>
     </div>
+
+    <!-- Core Game Logic Script -->
     <script src="script.js"></script>
 </body>
 </html>

@@ -1,7 +1,8 @@
 /**
  * NEO DRIVE SIMULATOR - CORE ENGINE
  * 
- * Optimized and feature-complete game engine.
+ * v4.0 - Optimized and feature-complete game engine with architectural comments.
+ * This script handles physics, rendering, input, and game state management.
  */
 
 (function () {
@@ -11,21 +12,28 @@
     // 1. ENGINE CONSTANTS
     // ==========================
 
+    // The current state of the game determines which screens are shown and if physics are active.
     const STATE = { START: 'START', PLAYING: 'PLAYING', PAUSED: 'PAUSED', GAMEOVER: 'GAMEOVER' };
 
+    /**
+     * CENTRALIZED ENGINE CONFIGURATION
+     * One hierarchical object that controls every aspect of the simulation.
+     * Making changes here will immediately affect game balance and visuals.
+     */
     const ENGINE_CONFIG = {
         VIEW: {
-            WIDTH: 1200,
-            HEIGHT: 1500 // Matches CSS 4:5 aspect ratio
+            WIDTH: 1200,   // Canvas width in logical pixels
+            HEIGHT: 1500  // Canvas height in logical pixels
         },
         CORE: {
             LANE_COUNT: 4,
             LANE_WIDTH: 250,
             ROAD_COLOR: '#080808',
             GRID_COLOR: 'rgba(0, 243, 255, 0.15)',
-            PHYSICS_STEP: 1 / 120,
+            PHYSICS_STEP: 1 / 120, // 120Hz sub-stepping for consistent physics
             ROAD_SAFETY_MARGIN: 50,
-            SCORE_SCALING: 10,
+            SCORE_SCALING: 10,     // Divisor for converting speed to score
+            // Dynamic margin calculation ensures the road is centered regardless of width
             get ROAD_MARGIN() { 
                 return (ENGINE_CONFIG.VIEW.WIDTH - (this.LANE_COUNT * this.LANE_WIDTH)) / 2; 
             }
@@ -33,13 +41,8 @@
         GAUGE: {
             CIRCUMFERENCE: 339,
             MAX_ARC: 255,
-            DISPLAY_MAX_SPEED: 320,
-            GAUGE_MAX_SPEED: 800,
-            NEEDLE_SMOOTHING: 8,
-            PULSE_THRESHOLD: 0.8,    // 80% of max speed
-            VIBRATE_THRESHOLD: 0.95, // 95% of max speed
-            VIBRATE_INTENSITY: 2,
-            COLOR_TRANSITION_SPEED: 5
+            DISPLAY_MAX_SPEED: 320, // What number the gauge displays as 'max'
+            GAUGE_MAX_SPEED: 800     // Internal speed units representing full gauge
         },
         GRID: {
             SPACING: 100,
@@ -61,18 +64,8 @@
                 NITRO_VOL_BOOST: 0.06,
                 LPF_FREQ: 500
             },
-            CRASH: {
-                DURATION: 0.4,
-                VOL: 0.25,
-                DECAY_VOL: 0.01
-            },
-            NEAR_MISS: {
-                FREQ_START: 800,
-                FREQ_END: 1200,
-                VOL: 0.1,
-                DECAY_VOL: 0.01,
-                DURATION: 0.1
-            }
+            CRASH: { DURATION: 0.4, VOL: 0.25, DECAY_VOL: 0.01 },
+            NEAR_MISS: { FREQ_START: 800, FREQ_END: 1200, VOL: 0.1, DECAY_VOL: 0.01, DURATION: 0.1 }
         },
         COLORS: {
             CYAN: '#00f3ff',
@@ -85,30 +78,17 @@
             NITRO_LINE: 'rgba(188, 19, 254, 0.4)'
         },
         COLLISION: {
-            NEAR_MISS: {
-                WIDTH: 90,
-                HEIGHT: 95,
-                THRESHOLD: 55,
-                NITRO_REWARD: 20,
-                SCORE_BASE: 500
-            },
-            CRASH: {
-                WIDTH: 50,
-                HEIGHT: 80,
-                HITSTOP: 300,
-                PARTICLE_COUNT: 30,
-                PARTICLE_SPEED: 15,
-                DEATH_DELAY: 300
-            }
+            NEAR_MISS: { WIDTH: 90, HEIGHT: 95, THRESHOLD: 55, NITRO_REWARD: 20, SCORE_BASE: 500 },
+            CRASH: { WIDTH: 50, HEIGHT: 80, HITSTOP: 300, PARTICLE_COUNT: 30, PARTICLE_SPEED: 15, DEATH_DELAY: 300 }
         },
         DIFFICULTY: {
             MAX_INTENSITY_SCORE: 100000,
-            SPEED_SCALING_FACTOR: 1.5,
-            SPAWN_INTERVAL: { MAX: 900, MIN: 500 },
+            SPEED_SCALING_FACTOR: 1.5, // Traffic/Spawn ramp-up multiplier
+            SPAWN_INTERVAL: { MAX: 900, MIN: 500 }, // Spawning frequency in ms
             LANE_SWITCH: {
-                INTENSITY_THRESHOLD: 0.5,
-                CHANCE: 0.5,      // Chance per second
-                COOLDOWN: 2.0,    // Seconds between switches
+                INTENSITY_THRESHOLD: 0.5, // AI starts switching lanes at 50% intensity
+                CHANCE: 0.5,      
+                COOLDOWN: 2.0,    
                 ACTIVE_RANGE: { MIN: -200, MAX: 800 }
             }
         },
@@ -122,11 +102,7 @@
                 TRAIL_MAX: 12,
                 SPEED_GLOW_FACTOR: 1.5
             },
-            SPARKS: {
-                COUNT: 10,
-                SPEED: 15,
-                COLOR: '#fffa00'
-            }
+            SPARKS: { COUNT: 10, SPEED: 15, COLOR: '#fffa00' }
         },
         PLAYER: {
             WIDTH: 70,
@@ -143,10 +119,7 @@
             TURN_SPEED: 600,
             MIN_SPEED_FOR_TURN: 200,
             MAX_NITRO: 100,
-            SHAKE: {
-                BASE: 2,
-                NITRO: 6
-            }
+            SHAKE: { BASE: 2, NITRO: 6 }
         },
         TRAFFIC: {
             WIDTH: 65,
@@ -162,53 +135,126 @@
         }
     };
 
-    class BaseEntity {
-        constructor(x, y, width, height) {
-            this.x = x;
-            this.y = y;
-            this.width = width;
-            this.height = height;
-        }
-    }
-
-    class Player extends BaseEntity {
-        constructor() {
-            super(ENGINE_CONFIG.VIEW.WIDTH / 2, ENGINE_CONFIG.PLAYER.Y_POS, ENGINE_CONFIG.PLAYER.WIDTH, ENGINE_CONFIG.PLAYER.HEIGHT);
-            this.speed = 0;
-            this.nitroActive = false;
-            this.trail = [];
-            this.tilt = 0;
-            this.glowIntensity = 0;
-            this.underglowPulse = 0;
-        }
-
-        reset() {
-            this.x = ENGINE_CONFIG.VIEW.WIDTH / 2;
-            this.y = ENGINE_CONFIG.PLAYER.Y_POS;
-            this.speed = 0;
-            this.nitroActive = false;
-            this.trail = [];
-            this.tilt = 0;
-            this.glowIntensity = 0;
-            this.underglowPulse = 0;
-        }
-    }
-
+    /**
+     * UTILITY FUNCTIONS
+     */
+    // Linear Interpolation: calculates a value between two numbers based on a percentage (amt).
+    // Essential for smooth animations and transitions.
     function lerp(start, end, amt) {
         return (1 - amt) * start + amt * end;
     }
 
 
     // ==========================
-    // 3. AUDIO ENGINE
+    // 2. BASE ARCHITECTURE
     // ==========================
 
+    /**
+     * BaseEntity: Fundamental structure for any physical object in the world.
+     * Encapsulates spatial coordinates and dimensions.
+     */
+    class BaseEntity {
+        constructor(x, y, w, h) {
+            this.x = x; this.y = y; this.width = w; this.height = h;
+        }
+    }
+
+    /**
+     * TrafficCar: Extends BaseEntity with AI behaviors.
+     */
+    class TrafficCar extends BaseEntity {
+        constructor() {
+            super(0, 0, ENGINE_CONFIG.TRAFFIC.WIDTH, ENGINE_CONFIG.TRAFFIC.HEIGHT);
+            this.reset();
+        }
+
+        reset() {
+            this.active = false;
+            this.missed = false;
+            this.switchCooldown = 0;
+            this.speed = 0;
+            this.lane = 0;
+            this.logicalY = ENGINE_CONFIG.TRAFFIC.INITIAL_Y;
+        }
+
+        spawn() {
+            this.lane = Math.floor(Math.random() * ENGINE_CONFIG.CORE.LANE_COUNT);
+            this.logicalY = ENGINE_CONFIG.TRAFFIC.INITIAL_Y;
+            this.active = true;
+            this.missed = false;
+            this.switchCooldown = Math.random() * 2;
+            this.speed = ENGINE_CONFIG.TRAFFIC.BASE_SPEED_MIN + Math.random() * ENGINE_CONFIG.TRAFFIC.BASE_SPEED_VAR;
+            const marginX = ENGINE_CONFIG.CORE.ROAD_MARGIN;
+            this.x = marginX + this.lane * ENGINE_CONFIG.CORE.LANE_WIDTH + ENGINE_CONFIG.CORE.LANE_WIDTH / 2;
+        }
+
+        // Logic for car movement and lane-switching AI
+        update(dt, playerSpeed, difficulty, playerX) {
+            if (!this.active) return;
+            
+            // Speed scales with game intensity
+            const diffMult = 1 + (difficulty * (ENGINE_CONFIG.DIFFICULTY.SPEED_SCALING_FACTOR - 1));
+            this.logicalY += (playerSpeed - (this.speed * diffMult)) * dt;
+            
+            // Visual X position smoothing for lane changes
+            const targetX = ENGINE_CONFIG.CORE.ROAD_MARGIN + this.lane * ENGINE_CONFIG.CORE.LANE_WIDTH + ENGINE_CONFIG.CORE.LANE_WIDTH / 2;
+            this.x = lerp(this.x, targetX, dt * ENGINE_CONFIG.TRAFFIC.X_SMOOTHING);
+
+            // AI Lane Switching Logic
+            if (difficulty > ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.INTENSITY_THRESHOLD) {
+                this.switchCooldown -= dt;
+                if (this.switchCooldown <= 0 && this.logicalY < ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.ACTIVE_RANGE.MAX && this.logicalY > ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.ACTIVE_RANGE.MIN) {
+                    if (Math.random() < ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.CHANCE * dt) {
+                        const marginX = ENGINE_CONFIG.CORE.ROAD_MARGIN;
+                        const playerLane = Math.floor((playerX - marginX) / ENGINE_CONFIG.CORE.LANE_WIDTH);
+                        if (playerLane !== this.lane) {
+                            const dir = playerLane > this.lane ? 1 : -1;
+                            const newLane = this.lane + dir;
+                            if (newLane >= 0 && newLane < ENGINE_CONFIG.CORE.LANE_COUNT) {
+                                this.lane = newLane;
+                                this.switchCooldown = ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.COOLDOWN;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Despawn check
+            if (this.logicalY > ENGINE_CONFIG.TRAFFIC.DESPAWN_Y_BOTTOM || this.logicalY < ENGINE_CONFIG.TRAFFIC.DESPAWN_Y_TOP) this.active = false;
+        }
+    }
+
+    /**
+     * Player: Extends BaseEntity with movement and visual state.
+     */
+    class Player extends BaseEntity {
+        constructor() {
+            super(ENGINE_CONFIG.VIEW.WIDTH / 2, ENGINE_CONFIG.PLAYER.Y_POS, ENGINE_CONFIG.PLAYER.WIDTH, ENGINE_CONFIG.PLAYER.HEIGHT);
+            this.reset();
+        }
+        reset() {
+            this.x = ENGINE_CONFIG.VIEW.WIDTH / 2;
+            this.speed = 0;
+            this.nitroActive = false;
+            this.trail = [];
+            this.tilt = 0;
+            this.glowIntensity = 0;
+            this.underglowPulse = 0;
+        }
+    }
+
+
+    // ==========================
+    // 3. GAME SYSTEMS
+    // ==========================
+
+    /**
+     * AudioEngine: Simple procedural sound synthesizer.
+     * Uses the Web Audio API to create engine and collision sounds on the fly.
+     */
     class AudioEngine {
         constructor() {
-            this.ctx = null;
-            this.osc = null;
-            this.gain = null;
-            this.initialized = false;
+            this.ctx = null; this.osc = null; this.gain = null; this.initialized = false;
         }
 
         init() {
@@ -217,24 +263,14 @@
                 this.ctx = new (window.AudioContext || window.webkitAudioContext)();
                 this.osc = this.ctx.createOscillator();
                 this.gain = this.ctx.createGain();
-
                 this.osc.type = 'sawtooth';
-                this.osc.frequency.setValueAtTime(ENGINE_CONFIG.AUDIO.ENGINE.BASE_FREQ, this.ctx.currentTime);
                 this.gain.gain.setValueAtTime(0, this.ctx.currentTime);
-
                 const lpf = this.ctx.createBiquadFilter();
                 lpf.type = 'lowpass';
                 lpf.frequency.setValueAtTime(ENGINE_CONFIG.AUDIO.ENGINE.LPF_FREQ, this.ctx.currentTime);
-
-                this.osc.connect(lpf);
-                lpf.connect(this.gain);
-                this.gain.connect(this.ctx.destination);
-
-                this.osc.start();
-                this.initialized = true;
-            } catch (e) {
-                console.warn("Audio Context failed.");
-            }
+                this.osc.connect(lpf); lpf.connect(this.gain); this.gain.connect(this.ctx.destination);
+                this.osc.start(); this.initialized = true;
+            } catch (e) { console.warn("Audio initialization failed."); }
         }
 
         update(speedRatio, isNitro) {
@@ -245,10 +281,7 @@
             this.gain.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.1);
         }
 
-        stop() {
-            if (this.gain && this.initialized)
-                this.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
-        }
+        stop() { if (this.gain && this.initialized) this.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1); }
 
         playCrash() {
             if (!this.initialized) return;
@@ -257,66 +290,31 @@
             const d = b.getChannelData(0);
             for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
             n.buffer = b;
-
             const g = this.ctx.createGain();
             g.gain.setValueAtTime(ENGINE_CONFIG.AUDIO.CRASH.VOL, this.ctx.currentTime);
             g.gain.exponentialRampToValueAtTime(ENGINE_CONFIG.AUDIO.CRASH.DECAY_VOL, this.ctx.currentTime + ENGINE_CONFIG.AUDIO.CRASH.DURATION);
-
-            n.connect(g);
-            g.connect(this.ctx.destination);
-            n.start();
+            n.connect(g); g.connect(this.ctx.destination); n.start();
         }
 
         playNearMiss() {
             if (!this.initialized) return;
-            const o = this.ctx.createOscillator();
-            const g = this.ctx.createGain();
+            const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
             o.type = 'square';
             o.frequency.setValueAtTime(ENGINE_CONFIG.AUDIO.NEAR_MISS.FREQ_START, this.ctx.currentTime);
             o.frequency.exponentialRampToValueAtTime(ENGINE_CONFIG.AUDIO.NEAR_MISS.FREQ_END, this.ctx.currentTime + ENGINE_CONFIG.AUDIO.NEAR_MISS.DURATION);
             g.gain.setValueAtTime(ENGINE_CONFIG.AUDIO.NEAR_MISS.VOL, this.ctx.currentTime);
             g.gain.exponentialRampToValueAtTime(ENGINE_CONFIG.AUDIO.NEAR_MISS.DECAY_VOL, this.ctx.currentTime + ENGINE_CONFIG.AUDIO.NEAR_MISS.DURATION);
-            o.connect(g);
-            g.connect(this.ctx.destination);
-            o.start();
-            o.stop(this.ctx.currentTime + ENGINE_CONFIG.AUDIO.NEAR_MISS.DURATION);
+            o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + ENGINE_CONFIG.AUDIO.NEAR_MISS.DURATION);
         }
     }
 
-
-    // ==========================
-    // 4. INPUT HANDLER
-    // ==========================
-
-    class InputHandler {
-        constructor() {
-            this.keys = {};
-            window.addEventListener('keydown', e => this.keys[e.code] = true);
-            window.addEventListener('keyup', e => this.keys[e.code] = false);
-
-            const setupTouch = (id, key) => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.addEventListener('touchstart', (e) => { e.preventDefault(); this.keys[key] = true; }, { passive: false });
-                el.addEventListener('touchend', (e) => { e.preventDefault(); this.keys[key] = false; }, { passive: false });
-            };
-
-            setupTouch('touch-left', 'KeyA');
-            setupTouch('touch-right', 'KeyD');
-            setupTouch('nitro-btn', 'ShiftLeft');
-            setupTouch('brake-btn', 'KeyS');
-        }
-
-        isPressed(code) { return !!this.keys[code]; }
-    }
-
-
-    // ==========================
-    // 5. UI HANDLER
-    // ==========================
-
+    /**
+     * UIHandler: Manages the Heads-Up Display and menu state.
+     * Uses a caching system to avoid expensive DOM updates when values haven't changed.
+     */
     class UIHandler {
         constructor() {
+            // DOM element references
             this.scoreVal = document.getElementById('score-val');
             this.comboVal = document.getElementById('combo-val');
             this.comboContainer = document.getElementById('combo-container');
@@ -327,7 +325,6 @@
             this.nearMissPop = document.getElementById('near-miss-pop');
             this.highScoreStart = document.getElementById('high-score-start');
             this.highScoreEnd = document.getElementById('high-score-end');
-
             this.screens = {
                 hud: document.getElementById('hud-overlay'),
                 start: document.getElementById('start-screen'),
@@ -335,77 +332,86 @@
                 gameOver: document.getElementById('game-over-screen')
             };
             this.flashOverlay = document.getElementById('flash-overlay');
-
+            
+            // Data cache to minimize DOM manipulation
             this.cache = { score: -1, combo: -1, speed: -1, nitro: -1, nitroReady: false };
-            this.internal = {
-                needlePercent: 0,
-                displaySpeed: 0,
-                gaugeColor: ENGINE_CONFIG.COLORS.CYAN
-            };
+            this.internal = { needlePercent: 0, displaySpeed: 0 };
         }
 
-        update(speed, nitro, score, combo, maxSpeed, dt, isNitroActive) {
-            const s = Math.floor(score);
-            if (this.cache.score !== s) {
-                if (this.scoreVal) this.scoreVal.textContent = s.toString().padStart(6, '0');
-                this.cache.score = s;
-            }
+        // Configuration-driven screen management
+        switchState(state, data = {}) {
+            // Screen configuration mapping
+            const stateConfig = {
+                [STATE.START]: { show: ['start'], update: () => { if (this.highScoreStart) this.highScoreStart.textContent = `BEST_DRIVE: ${data.highScore.toString().padStart(6, '0')}`; } },
+                [STATE.PLAYING]: { show: ['hud'], setup: () => {
+                    const isTouch = 'ontouchstart' in window;
+                    const c = document.getElementById('mobile-controls'), co = document.getElementById('mobile-only-controls');
+                    if (isTouch && c) c.classList.remove('hidden'); if (isTouch && co) co.classList.remove('hidden');
+                }},
+                [STATE.PAUSED]: { show: ['hud', 'pause'] },
+                [STATE.GAMEOVER]: { show: ['gameOver'], update: () => {
+                    const fs = document.getElementById('final-score'); if (fs) fs.textContent = Math.floor(data.score).toString().padStart(6, '0');
+                    if (this.highScoreEnd) this.highScoreEnd.textContent = data.highScore.toString().padStart(6, '0');
+                }}
+            };
 
-            // Nitro active screen effect
+            // Transition blur effect
+            const container = document.getElementById('game-container');
+            if (container) { container.style.filter = 'blur(10px) brightness(0.5)'; setTimeout(() => container.style.filter = 'none', 400); }
+
+            // Apply visibility changes
+            Object.values(this.screens).forEach(s => { if (s) s.classList.add('hidden'); });
+            const cfg = stateConfig[state];
+            if (cfg) {
+                cfg.show.forEach(s => { if (this.screens[s]) this.screens[s].classList.remove('hidden'); });
+                if (cfg.update) cfg.update(); if (cfg.setup) cfg.setup();
+            }
+        }
+
+        // Live HUD updates (called every frame)
+        update(speed, nitro, score, combo, dt, isNitroActive) {
+            // Update Score
+            const s = Math.floor(score);
+            if (this.cache.score !== s) { if (this.scoreVal) this.scoreVal.textContent = s.toString().padStart(6, '0'); this.cache.score = s; }
+
+            // Nitro active screen glitch effect
             const container = document.getElementById('game-container');
             if (container) container.classList.toggle('nitro-active', !!isNitroActive);
 
-            // 1. Smooth Speed Interpolation
+            // Update Speedometer Gauge & Numbers
             const targetRs = Math.round((speed / 1000) * ENGINE_CONFIG.GAUGE.DISPLAY_MAX_SPEED);
             this.internal.displaySpeed = lerp(this.internal.displaySpeed, targetRs, dt * ENGINE_CONFIG.GAUGE.NEEDLE_SMOOTHING);
-            const displaySpeedInt = Math.round(this.internal.displaySpeed);
+            const dsi = Math.round(this.internal.displaySpeed);
+            if (this.cache.speed !== dsi) { if (this.speedNum) this.speedNum.textContent = dsi; this.cache.speed = dsi; }
 
-            if (this.cache.speed !== displaySpeedInt) {
-                if (this.speedNum) this.speedNum.textContent = displaySpeedInt;
-                this.cache.speed = displaySpeedInt;
-            }
-
-            // 2. Gauge Visuals & Vibration
             if (this.speedGaugeFill) {
-                const targetPercent = Math.min(speed / ENGINE_CONFIG.GAUGE.GAUGE_MAX_SPEED, 1.25);
-                this.internal.needlePercent = lerp(this.internal.needlePercent, targetPercent, dt * ENGINE_CONFIG.GAUGE.NEEDLE_SMOOTHING);
+                const targetPct = Math.min(speed / ENGINE_CONFIG.GAUGE.GAUGE_MAX_SPEED, 1.25);
+                this.internal.needlePercent = lerp(this.internal.needlePercent, targetPct, dt * ENGINE_CONFIG.GAUGE.NEEDLE_SMOOTHING);
+                const offset = ENGINE_CONFIG.GAUGE.CIRCUMFERENCE - (this.internal.needlePercent * ENGINE_CONFIG.GAUGE.MAX_ARC);
                 
-                const circumference = ENGINE_CONFIG.GAUGE.CIRCUMFERENCE;
-                const maxArc = ENGINE_CONFIG.GAUGE.MAX_ARC;
-                const offset = circumference - (this.internal.needlePercent * maxArc);
-                
-                // Vibrate at high speeds
-                let vibration = 0;
-                if (targetPercent > ENGINE_CONFIG.GAUGE.VIBRATE_THRESHOLD) {
-                    vibration = (Math.random() - 0.5) * ENGINE_CONFIG.GAUGE.VIBRATE_INTENSITY;
-                }
-
+                // Gauge stress vibration at high speeds
+                let vibr = 0; if (targetPct > ENGINE_CONFIG.GAUGE.VIBRATE_THRESHOLD) vibr = (Math.random() - 0.5) * ENGINE_CONFIG.GAUGE.VIBRATE_INTENSITY;
                 this.speedGaugeFill.style.strokeDashoffset = offset;
-                this.speedGaugeFill.style.transform = `rotate(${vibration}deg)`;
+                this.speedGaugeFill.style.transform = `rotate(${vibr}deg)`;
                 
-                // Color Transition
                 const targetColor = speed > ENGINE_CONFIG.PLAYER.NORMAL_MAX_SPEED ? ENGINE_CONFIG.COLORS.RED : ENGINE_CONFIG.COLORS.CYAN;
                 this.speedGaugeFill.style.stroke = targetColor;
                 
-                // Pulse effect
-                if (targetPercent > ENGINE_CONFIG.GAUGE.PULSE_THRESHOLD) {
-                    this.speedGaugeFill.style.filter = `drop-shadow(0 0 ${10 + Math.sin(Date.now() / 50) * 5}px ${targetColor})`;
-                } else {
-                    this.speedGaugeFill.style.filter = 'none';
-                }
+                // Pulsing glow at high speeds
+                if (targetPct > ENGINE_CONFIG.GAUGE.PULSE_THRESHOLD) this.speedGaugeFill.style.filter = `drop-shadow(0 0 ${10 + Math.sin(Date.now() / 50) * 5}px ${targetColor})`;
+                else this.speedGaugeFill.style.filter = 'none';
             }
 
+            // Update Nitro Bar
             const n = Math.floor(nitro);
-            if (this.cache.nitro !== n) {
-                if (this.nitroBar) this.nitroBar.style.width = `${n}%`;
+            if (this.cache.nitro !== n) { 
+                if (this.nitroBar) this.nitroBar.style.width = `${n}%`; 
                 const ready = n >= ENGINE_CONFIG.PLAYER.MAX_NITRO;
-                if (this.cache.nitroReady !== ready) {
-                    if (this.nitroStatus) this.nitroStatus.classList.toggle('hidden', !ready);
-                    this.cache.nitroReady = ready;
-                }
-                this.cache.nitro = n;
+                if (this.cache.nitroReady !== ready) { if (this.nitroStatus) this.nitroStatus.classList.toggle('hidden', !ready); this.cache.nitroReady = ready; }
+                this.cache.nitro = n; 
             }
 
+            // Update Combo
             if (this.cache.combo !== combo) {
                 if (this.comboContainer) this.comboContainer.classList.toggle('hidden', combo <= 1);
                 if (this.comboVal && combo > 1) this.comboVal.textContent = `x${combo}`;
@@ -424,52 +430,11 @@
             this.nearMissPop.classList.remove('hidden');
             setTimeout(() => { if (this.nearMissPop) this.nearMissPop.classList.add('hidden'); }, 800);
         }
-
-        switchState(state, data = {}) {
-            const container = document.getElementById('game-container');
-            if (container) {
-                container.style.filter = 'blur(10px) brightness(0.5)';
-                setTimeout(() => container.style.filter = 'none', 400);
-            }
-
-            Object.values(this.screens).forEach(s => { if (s) s.classList.add('hidden'); });
-            const mobileControls = document.getElementById('mobile-controls');
-            const mobileOnly = document.getElementById('mobile-only-controls');
-            const isTouch = 'ontouchstart' in window;
-
-            const stateConfigs = {
-                [STATE.START]: () => {
-                    if (this.screens.start) this.screens.start.classList.remove('hidden');
-                    if (this.highScoreStart) this.highScoreStart.textContent = `BEST_DRIVE: ${data.highScore.toString().padStart(6, '0')}`;
-                },
-                [STATE.PLAYING]: () => {
-                    if (this.screens.hud) this.screens.hud.classList.remove('hidden');
-                    if (isTouch && mobileControls) mobileControls.classList.remove('hidden');
-                    if (isTouch && mobileOnly) mobileOnly.classList.remove('hidden');
-                },
-                [STATE.PAUSED]: () => {
-                    if (this.screens.hud) this.screens.hud.classList.remove('hidden');
-                    if (this.screens.pause) this.screens.pause.classList.remove('hidden');
-                },
-                [STATE.GAMEOVER]: () => {
-                    if (this.screens.gameOver) this.screens.gameOver.classList.remove('hidden');
-                    const finalScoreEl = document.getElementById('final-score');
-                    if (finalScoreEl) finalScoreEl.textContent = Math.floor(data.score).toString().padStart(6, '0');
-                    if (this.highScoreEnd) this.highScoreEnd.textContent = data.highScore.toString().padStart(6, '0');
-                    if (mobileControls) mobileControls.classList.add('hidden');
-                    if (mobileOnly) mobileOnly.classList.add('hidden');
-                }
-            };
-
-            if (stateConfigs[state]) stateConfigs[state]();
-        }
     }
 
-
-    // ==========================
-    // 6. PARTICLE ENGINE
-    // ==========================
-
+    /**
+     * ParticleSystem: Lightweight explosion and spark effects.
+     */
     class ParticleSystem {
         constructor() { this.particles = []; }
         spawn(x, y, color, count = ENGINE_CONFIG.PARTICLES.DEFAULT_COUNT, speed = ENGINE_CONFIG.PARTICLES.DEFAULT_SPEED) {
@@ -485,546 +450,391 @@
             }
         }
         draw(ctx) {
-            this.particles.forEach(p => {
-                ctx.globalAlpha = p.life;
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x, p.y, ENGINE_CONFIG.PARTICLES.SIZE, ENGINE_CONFIG.PARTICLES.SIZE);
-            });
+            this.particles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, ENGINE_CONFIG.PARTICLES.SIZE, ENGINE_CONFIG.PARTICLES.SIZE); });
             ctx.globalAlpha = 1;
         }
     }
 
 
     // ==========================
-    // 7. ENTITIES (Traffic)
+    // 4. GAME CONTROLLER
     // ==========================
 
-    class TrafficCar extends BaseEntity {
-        constructor() {
-            super(0, ENGINE_CONFIG.TRAFFIC.INITIAL_Y, ENGINE_CONFIG.TRAFFIC.WIDTH, ENGINE_CONFIG.TRAFFIC.HEIGHT);
-            this.reset();
-        }
-
-        reset() {
-            this.lane = Math.floor(Math.random() * ENGINE_CONFIG.CORE.LANE_COUNT);
-            this.logicalY = ENGINE_CONFIG.TRAFFIC.INITIAL_Y;
-            this.y = this.logicalY;
-            this.x = undefined;
-            this.speed = ENGINE_CONFIG.TRAFFIC.BASE_SPEED_MIN + Math.random() * ENGINE_CONFIG.TRAFFIC.BASE_SPEED_VAR;
-            this.color = ENGINE_CONFIG.TRAFFIC.COLORS[Math.floor(Math.random() * ENGINE_CONFIG.TRAFFIC.COLORS.length)];
-            this.active = false;
-            this.missed = false;
-            this.switchCooldown = 0;
-        }
-
-        spawn() {
-            this.lane = Math.floor(Math.random() * ENGINE_CONFIG.CORE.LANE_COUNT);
-            this.logicalY = ENGINE_CONFIG.TRAFFIC.INITIAL_Y;
-            this.active = true;
-            this.missed = false;
-            this.switchCooldown = Math.random() * 2;
-            const marginX = ENGINE_CONFIG.CORE.ROAD_MARGIN;
-            this.x = marginX + this.lane * ENGINE_CONFIG.CORE.LANE_WIDTH + ENGINE_CONFIG.CORE.LANE_WIDTH / 2;
-        }
-
-        update(dt, playerSpeed, difficulty, playerX) {
-            if (!this.active) return;
-            const difficultyMultiplier = 1 + (difficulty * (ENGINE_CONFIG.DIFFICULTY.SPEED_SCALING_FACTOR - 1));
-            this.logicalY += (playerSpeed - (this.speed * difficultyMultiplier)) * dt;
-            this.y = this.logicalY;
-
-            const marginX = ENGINE_CONFIG.CORE.ROAD_MARGIN;
-            const targetX = marginX + this.lane * ENGINE_CONFIG.CORE.LANE_WIDTH + ENGINE_CONFIG.CORE.LANE_WIDTH / 2;
-            if (this.x === undefined) this.x = targetX;
-            this.x = lerp(this.x, targetX, dt * ENGINE_CONFIG.TRAFFIC.X_SMOOTHING);
-
-            if (difficulty > ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.INTENSITY_THRESHOLD) {
-                this.switchCooldown -= dt;
-                if (this.switchCooldown <= 0 && this.logicalY < ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.ACTIVE_RANGE.MAX && this.logicalY > ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.ACTIVE_RANGE.MIN) {
-                    if (Math.random() < ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.CHANCE * dt) {
-                        const playerLane = Math.floor((playerX - marginX) / ENGINE_CONFIG.CORE.LANE_WIDTH);
-                        if (playerLane !== this.lane) {
-                            const dir = playerLane > this.lane ? 1 : -1;
-                            const newLane = this.lane + dir;
-                            if (newLane >= 0 && newLane < ENGINE_CONFIG.CORE.LANE_COUNT) {
-                                this.lane = newLane;
-                                this.switchCooldown = ENGINE_CONFIG.DIFFICULTY.LANE_SWITCH.COOLDOWN;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (this.logicalY > ENGINE_CONFIG.TRAFFIC.DESPAWN_Y_BOTTOM || this.logicalY < ENGINE_CONFIG.TRAFFIC.DESPAWN_Y_TOP) this.active = false;
-        }
-    }
-
-
-    // ==========================
-    // 8. GAME CONTROLLER
-    // ==========================
-
+    /**
+     * GameController: The Brain of the Engine.
+     * Orchestrates all systems and manages the high-level loop.
+     */
     class GameController {
-        // ==========================
-        // 1. INITIALIZATION
-        // ==========================
         constructor() {
             this.canvas = document.getElementById('gameCanvas');
             if (!this.canvas) return;
             this.ctx = this.canvas.getContext('2d');
+            
+            // System Initialization
             this.ui = new UIHandler();
             this.audio = new AudioEngine();
-            this.input = new InputHandler();
             this.particles = new ParticleSystem();
-
-            this.state = STATE.START;
-            this.score = 0;
-            this.combo = 1;
-            this.offset = 0;
-            this.shake = 0;
-            this.hitstop = 0;
-            this.nitro = ENGINE_CONFIG.PLAYER.MAX_NITRO;
-            this.crashTimer = null;
-            this.highScore = this.loadHighScore();
-            this.cameraScale = 1.0;
-            this.lastTime = 0;
-
             this.player = new Player();
             this.trafficPool = Array.from({ length: ENGINE_CONFIG.TRAFFIC.POOL_SIZE }, () => new TrafficCar());
-            this.spawnTimer = 0;
+            
+            // Input State
+            this.keys = {};
+            this.setupInput();
+
+            // Game State
+            this.state = STATE.START;
+            this.score = 0; this.combo = 1; this.offset = 0; this.shake = 0; this.hitstop = 0; this.spawnTimer = 0;
+            this.nitro = ENGINE_CONFIG.PLAYER.MAX_NITRO;
+            this.highScore = this.loadHighScore();
+            this.cameraScale = 1.0; this.lastTime = 0;
 
             this.init();
         }
 
+        // ==========================
+        // INITIALIZATION
+        // ==========================
         init() {
-            window.addEventListener('resize', () => this.resize());
-            this.resize();
-
-            const startBtn = document.getElementById('start-btn');
-            if (startBtn) startBtn.addEventListener('click', () => this.start());
-            const restartBtn = document.getElementById('restart-btn');
-            if (restartBtn) restartBtn.addEventListener('click', () => this.start());
-            const pauseBtnHud = document.getElementById('pause-btn-hud');
-            if (pauseBtnHud) pauseBtnHud.addEventListener('click', () => this.togglePause());
-            const resumeBtn = document.getElementById('resume-btn');
-            if (resumeBtn) resumeBtn.addEventListener('click', () => this.togglePause());
-
-            this.setupInput();
-            
+            this.setupResize();
+            this.setupEvents();
             this.ui.switchState(STATE.START, { highScore: this.highScore });
             requestAnimationFrame(t => this.loop(t));
         }
 
-        resize() {
-            const dpr = window.devicePixelRatio || 1;
-            const container = document.getElementById('game-container');
-            const winW = window.innerWidth, winH = window.innerHeight;
-            let tw = winW, th = winW * 1.25;
-            if (th > winH) { th = winH; tw = winH * 0.8; }
-            if (container) {
-                container.style.width = Math.floor(tw) + 'px';
-                container.style.height = Math.floor(th) + 'px';
-            }
-            this.canvas.width = Math.floor(ENGINE_CONFIG.VIEW.WIDTH * dpr);
-            this.canvas.height = Math.floor(ENGINE_CONFIG.VIEW.HEIGHT * dpr);
-            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-            this.ctx.scale(dpr, dpr);
+        setupInput() {
+            window.addEventListener('keydown', e => this.keys[e.code] = true);
+            window.addEventListener('keyup', e => this.keys[e.code] = false);
+            
+            // Touch helper mapping
+            const setupTouch = (id, key) => {
+                const el = document.getElementById(id); if (!el) return;
+                el.addEventListener('touchstart', (e) => { e.preventDefault(); this.keys[key] = true; }, { passive: false });
+                el.addEventListener('touchend', (e) => { e.preventDefault(); this.keys[key] = false; }, { passive: false });
+            };
+            setupTouch('touch-left', 'KeyA'); setupTouch('touch-right', 'KeyD'); setupTouch('nitro-btn', 'ShiftLeft'); setupTouch('brake-btn', 'KeyS');
         }
 
-        loadHighScore() {
-            return parseInt(localStorage.getItem('neoDrive_highScore')) || 0;
+        setupResize() {
+            const resize = () => {
+                const dpr = window.devicePixelRatio || 1;
+                const container = document.getElementById('game-container');
+                const winW = window.innerWidth, winH = window.innerHeight;
+                let tw = winW, th = winW * 1.25; if (th > winH) { th = winH; tw = winH * 0.8; }
+                if (container) { container.style.width = Math.floor(tw) + 'px'; container.style.height = Math.floor(th) + 'px'; }
+                this.canvas.width = Math.floor(ENGINE_CONFIG.VIEW.WIDTH * dpr); this.canvas.height = Math.floor(ENGINE_CONFIG.VIEW.HEIGHT * dpr);
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0); this.ctx.scale(dpr, dpr);
+            };
+            window.addEventListener('resize', resize); resize();
+        }
+
+        setupEvents() {
+            const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+            bind('start-btn', () => this.start()); bind('restart-btn', () => this.start());
+            bind('pause-btn-hud', () => this.togglePause()); bind('resume-btn', () => this.togglePause());
+
+            window.addEventListener('keydown', e => {
+                if (e.code === 'KeyP' || e.code === 'Escape') this.togglePause();
+                if ((e.code === 'Enter' || e.code === 'NumpadEnter') && (this.state === STATE.START || this.state === STATE.GAMEOVER)) this.start();
+            });
         }
 
         // ==========================
-        // 2. CORE LOGIC
+        // CORE LOGIC
         // ==========================
         start() {
             if (this.crashTimer) clearTimeout(this.crashTimer);
             this.state = STATE.PLAYING;
-            this.score = 0;
-            this.combo = 1;
-            this.nitro = ENGINE_CONFIG.PLAYER.MAX_NITRO;
-            this.player.reset();
-            this.trafficPool.forEach(c => c.active = false);
-            this.particles.particles = [];
-            this.offset = 0;
-            this.shake = 0;
-            this.hitstop = 0;
-            this.spawnTimer = 0;
-            this.cameraScale = 1.0;
-            this.ui.switchState(STATE.PLAYING);
-            this.audio.init();
+            this.score = 0; this.combo = 1; this.nitro = ENGINE_CONFIG.PLAYER.MAX_NITRO;
+            this.player.reset(); this.trafficPool.forEach(c => c.reset());
+            this.particles.particles = []; this.offset = 0; this.shake = 0; this.hitstop = 0; this.spawnTimer = 0; this.cameraScale = 1.0;
+            this.ui.switchState(STATE.PLAYING); this.audio.init();
         }
 
+        togglePause() {
+            if (this.state === STATE.PLAYING) { this.state = STATE.PAUSED; this.audio.stop(); this.ui.switchState(STATE.PAUSED); }
+            else if (this.state === STATE.PAUSED) { this.state = STATE.PLAYING; this.ui.switchState(STATE.PLAYING); }
+        }
+
+        /**
+         * The Update Loop
+         * Handles physics, difficulty, and state changes.
+         * Uses sub-stepping (the while loop) to ensure deterministic physics even if FPS drops.
+         */
         update(dt) {
             if (this.state === STATE.PAUSED) return;
             if (this.hitstop > 0) { this.hitstop -= dt * 1000; return; }
             if (this.state !== STATE.PLAYING) return;
 
             const difficulty = this.getDifficulty();
-            let isMoving = (this.input.isPressed('KeyW') || this.input.isPressed('ArrowUp'));
-            let isBraking = (this.input.isPressed('KeyS') || this.input.isPressed('ArrowDown'));
+            
+            // 1. INPUT PROCESSING
+            let isMoving = (this.keys['KeyW'] || this.keys['ArrowUp']);
+            let isBraking = (this.keys['KeyS'] || this.keys['ArrowDown']);
             if (!isMoving && ('ontouchstart' in window) && window.innerWidth < 1024) isMoving = true;
 
+            // 2. NITRO LOGIC
             this.player.nitroActive = false;
-            if ((this.input.isPressed('ShiftLeft') || this.input.isPressed('ShiftRight')) && this.nitro > 0 && isMoving) {
+            if ((this.keys['ShiftLeft'] || this.keys['ShiftRight']) && this.nitro > 0 && isMoving) {
                 this.nitro -= ENGINE_CONFIG.PLAYER.NITRO_CONSUMPTION * dt;
                 this.player.nitroActive = true;
             } else if (this.player.speed > 10) {
                 this.nitro = Math.min(ENGINE_CONFIG.PLAYER.MAX_NITRO, this.nitro + ENGINE_CONFIG.PLAYER.NITRO_REGEN * dt);
             }
 
+            // 3. PHYSICS SUB-STEPPING
+            // Distributes the 'dt' time slice into smaller chunks for high-speed accuracy.
             let remaining = dt;
             const maxSpeed = ENGINE_CONFIG.PLAYER.MAX_SPEED * (1 + difficulty * (ENGINE_CONFIG.DIFFICULTY.SPEED_SCALING_FACTOR - 1));
 
             while (remaining > 0) {
                 const step = Math.min(remaining, ENGINE_CONFIG.CORE.PHYSICS_STEP);
+                // Linear acceleration/deceleration
+                if (isBraking) this.player.speed = Math.max(0, this.player.speed - ENGINE_CONFIG.PLAYER.BRAKE_FORCE * step);
+                else if (isMoving) {
+                    const acc = this.player.nitroActive ? ENGINE_CONFIG.PLAYER.NITRO_ACCEL : ENGINE_CONFIG.PLAYER.ACCEL;
+                    this.player.speed = Math.min(this.player.speed + acc * step, maxSpeed);
+                } else this.player.speed = Math.max(0, this.player.speed - ENGINE_CONFIG.PLAYER.FRICTION * step);
                 
-                // 1. Velocity Update
-                if (isBraking) {
-                    this.player.speed = Math.max(0, this.player.speed - ENGINE_CONFIG.PLAYER.BRAKE_FORCE * step);
-                } else if (isMoving) {
-                    const accel = this.player.nitroActive ? ENGINE_CONFIG.PLAYER.NITRO_ACCEL : ENGINE_CONFIG.PLAYER.ACCEL;
-                    this.player.speed = Math.min(this.player.speed + accel * step, maxSpeed);
-                } else {
-                    this.player.speed = Math.max(0, this.player.speed - ENGINE_CONFIG.PLAYER.FRICTION * step);
-                }
-
-                // 2. Position Update (Steer)
+                // Turn logic (only allows sharp turns when moving)
                 const turnFactor = Math.min(this.player.speed / ENGINE_CONFIG.PLAYER.MIN_SPEED_FOR_TURN, 1.0);
-                if (this.input.isPressed('KeyA') || this.input.isPressed('ArrowLeft')) this.player.x -= ENGINE_CONFIG.PLAYER.TURN_SPEED * turnFactor * step;
-                if (this.input.isPressed('KeyD') || this.input.isPressed('ArrowRight')) this.player.x += ENGINE_CONFIG.PLAYER.TURN_SPEED * turnFactor * step;
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) this.player.x -= ENGINE_CONFIG.PLAYER.TURN_SPEED * turnFactor * step;
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) this.player.x += ENGINE_CONFIG.PLAYER.TURN_SPEED * turnFactor * step;
                 
-                const margin = ENGINE_CONFIG.CORE.ROAD_MARGIN + ENGINE_CONFIG.CORE.ROAD_SAFETY_MARGIN;
-                this.player.x = Math.max(margin, Math.min(this.player.x, ENGINE_CONFIG.VIEW.WIDTH - margin));
-
-                // 3. World Progression
+                // World scrolling offset
                 this.offset += this.player.speed * step;
-
-                // 4. Traffic Simulation
-                this.trafficPool.forEach(c => c.update(step, this.player.speed, difficulty, this.player.x));
-
                 remaining -= step;
             }
 
+            // Boundary clamping
+            const margin = ENGINE_CONFIG.CORE.ROAD_MARGIN + ENGINE_CONFIG.CORE.ROAD_SAFETY_MARGIN;
+            this.player.x = Math.max(margin, Math.min(this.player.x, ENGINE_CONFIG.VIEW.WIDTH - margin));
+
+            // 4. TRAFFIC & DIFFICULTY
             this.spawnTimer += dt * 1000;
             const spawnInterval = ENGINE_CONFIG.DIFFICULTY.SPAWN_INTERVAL.MAX - (difficulty * (ENGINE_CONFIG.DIFFICULTY.SPAWN_INTERVAL.MAX - ENGINE_CONFIG.DIFFICULTY.SPAWN_INTERVAL.MIN));
             if (this.spawnTimer > spawnInterval) {
-                const car = this.trafficPool.find(c => !c.active);
-                if (car) { car.spawn(); this.spawnTimer = 0; }
+                const car = this.trafficPool.find(c => !c.active); if (car) { car.spawn(); this.spawnTimer = 0; }
             }
+            this.trafficPool.forEach(c => c.update(dt, this.player.speed, difficulty, this.player.x));
 
+            // 5. SCORE & COLLISION
             if (this.player.speed > 10) this.score += (this.player.speed * dt) / ENGINE_CONFIG.CORE.SCORE_SCALING;
             this.checkCollisions();
 
-            this.ui.update(this.player.speed, this.nitro, this.score, this.combo, ENGINE_CONFIG.PLAYER.NORMAL_MAX_SPEED, dt, this.player.nitroActive);
+            // 6. VISUAL PROCESSING
+            this.updateVisuals(dt);
+            
+            // 7. SYSTEM UPDATES
+            this.shake = (this.player.speed / ENGINE_CONFIG.PLAYER.MAX_SPEED) * ENGINE_CONFIG.PLAYER.SHAKE.BASE + (this.player.nitroActive ? ENGINE_CONFIG.PLAYER.SHAKE.NITRO : 0);
+            this.ui.update(this.player.speed, this.nitro, this.score, this.combo, dt, this.player.nitroActive);
             this.audio.update(this.player.speed / ENGINE_CONFIG.PLAYER.MAX_SPEED, this.player.nitroActive);
         }
 
         updateVisuals(dt) {
-            if (this.state !== STATE.PLAYING && this.state !== STATE.PAUSED) return;
-
-            // 1. Tilt Calculation
-            const targetTilt = (this.input.isPressed('KeyA') || this.input.isPressed('ArrowLeft')) ? -ENGINE_CONFIG.VISUALS.PLAYER.STEER_TILT_MAX : 
-                               (this.input.isPressed('KeyD') || this.input.isPressed('ArrowRight')) ? ENGINE_CONFIG.VISUALS.PLAYER.STEER_TILT_MAX : 0;
+            // Steering tilt animation
+            const targetTilt = (this.keys['KeyA'] || this.keys['ArrowLeft']) ? -ENGINE_CONFIG.VISUALS.PLAYER.STEER_TILT_MAX : 
+                               (this.keys['KeyD'] || this.keys['ArrowRight']) ? ENGINE_CONFIG.VISUALS.PLAYER.STEER_TILT_MAX : 0;
             this.player.tilt = lerp(this.player.tilt, targetTilt, dt * ENGINE_CONFIG.VISUALS.PLAYER.TILT_SMOOTHING);
             
-            // 2. Pulse & Glow
+            // Glow and pulse calculations
             this.player.underglowPulse += dt * 5;
             const speedRatio = this.player.speed / ENGINE_CONFIG.PLAYER.MAX_SPEED;
             this.player.glowIntensity = (speedRatio * ENGINE_CONFIG.VISUALS.PLAYER.SPEED_GLOW_FACTOR) + (this.player.nitroActive ? 1.5 : 1.0);
 
-            // 3. Trail Logic
+            // Nitro Ghosting/Trail Logic
             if (this.player.nitroActive) {
                 this.player.trail.push({ x: this.player.x, y: this.player.y });
                 if (this.player.trail.length > ENGINE_CONFIG.VISUALS.PLAYER.TRAIL_MAX) this.player.trail.shift();
-            } else if (this.player.trail.length > 0) {
-                this.player.trail.shift();
-            }
+            } else if (this.player.trail.length > 0) this.player.trail.shift();
 
-            // 4. Camera & Shake
+            // Camera FOV Warp transition
             const targetScale = this.player.nitroActive ? 0.95 : 1.0;
             this.cameraScale = lerp(this.cameraScale, targetScale, dt * 5);
-            this.shake = (this.player.speed / ENGINE_CONFIG.PLAYER.MAX_SPEED) * ENGINE_CONFIG.PLAYER.SHAKE.BASE + (this.player.nitroActive ? ENGINE_CONFIG.PLAYER.SHAKE.NITRO : 0);
         }
 
         checkCollisions() {
             const px = this.player.x, py = this.player.y;
             for (const c of this.trafficPool) {
                 if (!c.active) continue;
-                const dx = Math.abs(px - c.x), dy = Math.abs(py - c.y);
+                const dx = Math.abs(px - c.x), dy = Math.abs(py - c.logicalY);
 
+                // Near Miss Detection
                 if (dx < ENGINE_CONFIG.COLLISION.NEAR_MISS.WIDTH && dy < ENGINE_CONFIG.COLLISION.NEAR_MISS.HEIGHT && !c.missed) {
                     if (dx >= ENGINE_CONFIG.COLLISION.NEAR_MISS.THRESHOLD) {
                         this.score += ENGINE_CONFIG.COLLISION.NEAR_MISS.SCORE_BASE * this.combo;
-                        this.combo++;
-                        this.ui.showNearMiss();
-                        this.audio.playNearMiss();
-                        c.missed = true;
+                        this.combo++; this.ui.showNearMiss(); this.audio.playNearMiss(); c.missed = true;
                         this.nitro = Math.min(ENGINE_CONFIG.PLAYER.MAX_NITRO, this.nitro + ENGINE_CONFIG.COLLISION.NEAR_MISS.NITRO_REWARD);
                     }
                 }
 
+                // Crash Detection
                 if (dx < ENGINE_CONFIG.COLLISION.CRASH.WIDTH && dy < ENGINE_CONFIG.COLLISION.CRASH.HEIGHT) {
                     this.particles.spawn(px, py, ENGINE_CONFIG.VISUALS.SPARKS.COLOR, ENGINE_CONFIG.VISUALS.SPARKS.COUNT, ENGINE_CONFIG.VISUALS.SPARKS.SPEED);
-                    this.ui.triggerFlash();
-                    this.audio.playCrash();
-                    this.hitstop = ENGINE_CONFIG.COLLISION.CRASH.HITSTOP;
+                    this.ui.triggerFlash(); this.audio.playCrash(); this.hitstop = ENGINE_CONFIG.COLLISION.CRASH.HITSTOP;
                     this.particles.spawn(px, py, ENGINE_CONFIG.COLORS.RED, ENGINE_CONFIG.COLLISION.CRASH.PARTICLE_COUNT, ENGINE_CONFIG.COLLISION.CRASH.PARTICLE_SPEED);
                     this.saveHighScore(this.score);
                     this.crashTimer = setTimeout(() => {
                         if (this.state === STATE.PLAYING) {
-                            this.state = STATE.GAMEOVER;
-                            this.ui.switchState(STATE.GAMEOVER, { score: this.score, highScore: this.highScore });
-                            this.audio.stop();
+                            this.state = STATE.GAMEOVER; this.ui.switchState(STATE.GAMEOVER, { score: this.score, highScore: this.highScore }); this.audio.stop();
                         }
                     }, ENGINE_CONFIG.COLLISION.CRASH.DEATH_DELAY);
                 }
             }
         }
 
-        togglePause() {
-            if (this.state === STATE.PLAYING) {
-                this.state = STATE.PAUSED;
-                this.audio.stop();
-                this.ui.switchState(STATE.PAUSED);
-            } else if (this.state === STATE.PAUSED) {
-                this.state = STATE.PLAYING;
-                this.ui.switchState(STATE.PLAYING);
-            }
-        }
-
-        saveHighScore(s) {
-            if (s > this.highScore) {
-                this.highScore = Math.floor(s);
-                localStorage.setItem('neoDrive_highScore', this.highScore);
-            }
-        }
-
-        getDifficulty() {
-            return Math.min(1.0, this.score / ENGINE_CONFIG.DIFFICULTY.MAX_INTENSITY_SCORE);
-        }
-
-        loop(timestamp) {
-            const dt = Math.min((timestamp - (this.lastTime || timestamp)) / 1000, 0.1);
-            this.lastTime = timestamp;
-            this.update(dt);
-            this.updateVisuals(dt);
-            this.particles.update(dt);
-            this.render();
-            requestAnimationFrame(t => this.loop(t));
-        }
-
         // ==========================
-        // 3. VISUAL PROCESSING
+        // RENDERING PIPELINE
         // ==========================
         render() {
             const { ctx } = this;
-            const viewWidth = ENGINE_CONFIG.VIEW.WIDTH;
-            const viewHeight = ENGINE_CONFIG.VIEW.HEIGHT;
-
-            ctx.clearRect(0, 0, viewWidth, viewHeight);
+            ctx.clearRect(0, 0, ENGINE_CONFIG.VIEW.WIDTH, ENGINE_CONFIG.VIEW.HEIGHT);
             ctx.save();
             
-            if (this.shake > 0) {
-                ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
-            }
-            
+            // Screen Shake and FOV scaling
+            if (this.shake > 0) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
             if (this.cameraScale !== 1.0) {
-                const cx = viewWidth / 2;
-                const cy = this.player.y;
-                ctx.translate(cx, cy);
-                ctx.scale(this.cameraScale, this.cameraScale);
-                ctx.translate(-cx, -cy);
+                const cx = ENGINE_CONFIG.VIEW.WIDTH / 2, cy = ENGINE_CONFIG.PLAYER.Y_POS;
+                ctx.translate(cx, cy); ctx.scale(this.cameraScale, this.cameraScale); ctx.translate(-cx, -cy);
             }
 
-            // 1. Road Background
-            ctx.fillStyle = ENGINE_CONFIG.COLORS.ROAD_BASE;
-            ctx.fillRect(0, 0, viewWidth, viewHeight);
-            
-            const marginX = ENGINE_CONFIG.CORE.ROAD_MARGIN;
-            const roadWidth = ENGINE_CONFIG.CORE.LANE_COUNT * ENGINE_CONFIG.CORE.LANE_WIDTH;
-            ctx.fillStyle = ENGINE_CONFIG.CORE.ROAD_COLOR;
-            ctx.fillRect(marginX, 0, roadWidth, viewHeight);
-
-            // 2. Grid Lines
-            ctx.strokeStyle = ENGINE_CONFIG.CORE.GRID_COLOR;
-            ctx.lineWidth = ENGINE_CONFIG.GRID.LINE_WIDTH;
-            ctx.beginPath();
-            for (let i = -1; i <= 10; i++) {
-                const y = (i * ENGINE_CONFIG.GRID.SPACING + (this.offset % ENGINE_CONFIG.GRID.SPACING));
-                ctx.moveTo(marginX, y);
-                ctx.lineTo(viewWidth - marginX, y);
-            }
-            ctx.stroke();
-
-            // 3. Lane Lines
-            for (let i = 0; i <= ENGINE_CONFIG.CORE.LANE_COUNT; i++) {
-                const x = marginX + i * ENGINE_CONFIG.CORE.LANE_WIDTH;
-                ctx.beginPath();
-                const isEdge = (i === 0 || i === ENGINE_CONFIG.CORE.LANE_COUNT);
-                ctx.strokeStyle = isEdge ? ENGINE_CONFIG.COLORS.CYAN : ENGINE_CONFIG.COLORS.LANE_LINE;
-                ctx.lineWidth = isEdge ? 4 : 2;
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, viewHeight);
-                ctx.stroke();
-            }
-
-            // 4. Nitro Speed Lines
-            if (this.player.nitroActive) {
-                ctx.strokeStyle = ENGINE_CONFIG.COLORS.NITRO_LINE;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                for (let i = 0; i < 20; i++) {
-                    const x = Math.random() * viewWidth;
-                    const y = Math.random() * viewHeight;
-                    const len = 50 + Math.random() * 100;
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(x, y + len);
-                }
-                ctx.stroke();
-            }
-
-            // 5. Trail / Ghosting
-            if (this.player.trail.length > 1) {
-                this.player.trail.forEach((pos, i) => {
-                    const alpha = (i / this.player.trail.length) * 0.3;
-                    this.drawCarBody({
-                        x: pos.x,
-                        y: pos.y,
-                        w: this.player.width,
-                        h: this.player.height,
-                        color: ENGINE_CONFIG.COLORS.MAGENTA,
-                        alpha: alpha,
-                        isGhost: true
-                    });
-                });
-            }
-
-            // 6. Traffic
-            this.trafficPool.forEach(c => {
-                if (c.active) {
-                    this.drawCarBody({
-                        x: c.x,
-                        y: c.y,
-                        w: c.width,
-                        h: c.height,
-                        color: c.color,
-                        isPlayer: false
-                    });
-                }
-            });
-
-            // 7. Player
-            this.drawCarBody({
-                x: this.player.x,
-                y: this.player.y,
-                w: this.player.width,
-                h: this.player.height,
-                color: ENGINE_CONFIG.COLORS.PLAYER,
-                isPlayer: true,
-                tilt: this.player.tilt,
-                nitroActive: this.player.nitroActive,
-                glowIntensity: this.player.glowIntensity,
-                underglowPulse: this.player.underglowPulse,
-                speed: this.player.speed
-            });
-
-            // 8. Particles
+            this.drawRoad();
+            this.drawTraffic();
+            this.drawPlayer();
             this.particles.draw(ctx);
             
             ctx.restore();
         }
 
+        drawRoad() {
+            const { ctx } = this;
+            const marginX = ENGINE_CONFIG.CORE.ROAD_MARGIN;
+            const roadW = ENGINE_CONFIG.CORE.LANE_COUNT * ENGINE_CONFIG.CORE.LANE_WIDTH;
+            
+            ctx.fillStyle = ENGINE_CONFIG.COLORS.ROAD_BASE; ctx.fillRect(0, 0, ENGINE_CONFIG.VIEW.WIDTH, ENGINE_CONFIG.VIEW.HEIGHT);
+            ctx.fillStyle = ENGINE_CONFIG.CORE.ROAD_COLOR; ctx.fillRect(marginX, 0, roadW, ENGINE_CONFIG.VIEW.HEIGHT);
+
+            // Horizontal Grid Lines
+            ctx.strokeStyle = ENGINE_CONFIG.CORE.GRID_COLOR; ctx.lineWidth = ENGINE_CONFIG.GRID.LINE_WIDTH;
+            for (let i = -1; i <= 15; i++) {
+                const y = (i * ENGINE_CONFIG.GRID.SPACING + (this.offset % ENGINE_CONFIG.GRID.SPACING));
+                ctx.beginPath(); ctx.moveTo(marginX, y); ctx.lineTo(ENGINE_CONFIG.VIEW.WIDTH - marginX, y); ctx.stroke();
+            }
+
+            // Vertical Lane Lines
+            for (let i = 0; i <= ENGINE_CONFIG.CORE.LANE_COUNT; i++) {
+                const x = marginX + i * ENGINE_CONFIG.CORE.LANE_WIDTH;
+                ctx.beginPath();
+                ctx.strokeStyle = (i === 0 || i === ENGINE_CONFIG.CORE.LANE_COUNT) ? ENGINE_CONFIG.COLORS.CYAN : ENGINE_CONFIG.COLORS.LANE_LINE;
+                ctx.lineWidth = (i === 0 || i === ENGINE_CONFIG.CORE.LANE_COUNT) ? 4 : 2;
+                ctx.moveTo(x, 0); ctx.lineTo(x, ENGINE_CONFIG.VIEW.HEIGHT); ctx.stroke();
+            }
+
+            // Nitro "Speed Rain" effect
+            if (this.player.nitroActive) {
+                ctx.strokeStyle = ENGINE_CONFIG.COLORS.NITRO_LINE; ctx.lineWidth = 2;
+                for (let i = 0; i < 20; i++) {
+                    const x = Math.random() * ENGINE_CONFIG.VIEW.WIDTH, y = Math.random() * ENGINE_CONFIG.VIEW.HEIGHT, len = 50 + Math.random() * 100;
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + len); ctx.stroke();
+                }
+            }
+        }
+
+        drawTraffic() {
+            this.trafficPool.forEach(c => {
+                if (c.active) this.drawCarBody({ x: c.x, y: c.logicalY, w: c.width, h: c.height, color: c.color });
+            });
+        }
+
+        drawPlayer() {
+            // Draw Ghost Trail during Nitro
+            if (this.player.trail.length > 1) {
+                this.player.trail.forEach((pos, i) => {
+                    this.drawCarBody({ x: pos.x, y: pos.y, w: this.player.width, h: this.player.height, color: ENGINE_CONFIG.COLORS.MAGENTA, alpha: i / this.player.trail.length * 0.3, isGhost: true });
+                });
+            }
+            // Draw Main Player Car
+            this.drawCarBody({ x: this.player.x, y: this.player.y, w: this.player.width, h: this.player.height, color: ENGINE_CONFIG.COLORS.PLAYER, isPlayer: true });
+        }
+
+        /**
+         * Unified Car Drawing Engine
+         * Draws chassis, lights, underglow, and exhaust based on a car config object.
+         */
         drawCarBody(cfg) {
             const { ctx } = this;
-            const { x, y, w, h, color, tilt = 0, isPlayer = false, isGhost = false, nitroActive = false, glowIntensity = 1, underglowPulse = 0, speed = 0, alpha = 1 } = cfg;
-            const px = -w / 2, py = -h / 2;
+            ctx.save(); ctx.translate(cfg.x, cfg.y);
 
-            ctx.save();
-            ctx.translate(x, y);
+            // Apply steering tilt if it's the player
+            if (cfg.isPlayer) ctx.rotate(this.player.tilt * Math.PI / 180);
 
-            if (isPlayer && !isGhost) {
-                ctx.rotate(tilt * Math.PI / 180);
-                
-                // Underglow
-                const ugColor = nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : ENGINE_CONFIG.COLORS.CYAN;
-                const ugPulse = 15 + Math.sin(underglowPulse) * 10;
-                ctx.shadowBlur = ugPulse;
-                ctx.shadowColor = ugColor;
-                ctx.fillStyle = ugColor + '44';
-                ctx.fillRect(px - 10, py - 10, w + 20, h + 20);
+            // Underglow rendering
+            if (cfg.isPlayer && !cfg.isGhost) {
+                const ugColor = this.player.nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : ENGINE_CONFIG.COLORS.CYAN;
+                const ugPulse = 15 + Math.sin(this.player.underglowPulse) * 10;
+                ctx.shadowBlur = ugPulse; ctx.shadowColor = ugColor; ctx.fillStyle = ugColor + '44';
+                ctx.fillRect(-cfg.w / 2 - 10, -cfg.h / 2 - 10, cfg.w + 20, cfg.h + 20);
             }
 
-            if (isGhost) {
-                ctx.globalAlpha = alpha;
-                ctx.fillStyle = color;
-                ctx.fillRect(px, py, w, h);
-                ctx.restore();
-                return;
-            }
+            // Chassis Glow
+            if (cfg.isPlayer && !cfg.isGhost) {
+                ctx.shadowBlur = ENGINE_CONFIG.VISUALS.PLAYER.GLOW_STRENGTH * this.player.glowIntensity;
+                ctx.shadowColor = this.player.nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : ENGINE_CONFIG.COLORS.CYAN;
+            } else if (cfg.isGhost) {
+                ctx.fillStyle = cfg.color; ctx.globalAlpha = cfg.alpha || 0.3;
+                ctx.fillRect(-cfg.w / 2, -cfg.h / 2, cfg.w, cfg.h); ctx.restore(); return;
+            } else { ctx.shadowBlur = 5; ctx.shadowColor = cfg.color; }
 
-            // Glow Effect
-            if (isPlayer) {
-                ctx.shadowBlur = ENGINE_CONFIG.VISUALS.PLAYER.GLOW_STRENGTH * glowIntensity;
-                ctx.shadowColor = nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : ENGINE_CONFIG.COLORS.CYAN;
-                ctx.fillStyle = nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : color;
-            } else {
-                ctx.shadowBlur = 5;
-                ctx.shadowColor = color;
-                ctx.fillStyle = color;
-            }
-
-            // Main Body
-            ctx.fillRect(px, py, w, h);
-            
-            // Cockpit / Details
+            // Main Body and Windows
+            ctx.fillStyle = cfg.isPlayer ? (this.player.nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : ENGINE_CONFIG.COLORS.PLAYER) : cfg.color;
+            ctx.fillRect(-cfg.w / 2, -cfg.h / 2, cfg.w, cfg.h);
             ctx.fillStyle = '#000';
-            ctx.globalAlpha = 1;
-            ctx.fillRect(px + w * 0.15, py + h * 0.2, w * 0.7, h * 0.25);
-            ctx.fillRect(px + w * 0.15, py + h * 0.6, w * 0.7, h * 0.15);
+            ctx.fillRect(-cfg.w / 2 + cfg.w * 0.15, -cfg.h / 2 + cfg.h * 0.2, cfg.w * 0.7, cfg.h * 0.25);
+            ctx.fillRect(-cfg.w / 2 + cfg.w * 0.15, -cfg.h / 2 + cfg.h * 0.6, cfg.w * 0.7, cfg.h * 0.15);
 
-            if (isPlayer) {
-                // Headlights
-                ctx.fillStyle = '#fff';
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = '#fff';
-                ctx.fillRect(px + 5, py - 5, 15, 6);
-                ctx.fillRect(px + w - 20, py - 5, 15, 6);
-
-                // Exhaust Flames
-                if (speed > 100) {
-                    const flameLen = (speed / 1000) * 80 * (nitroActive ? 2 : 1);
-                    const flicker = Math.random() * 15;
-                    ctx.shadowBlur = 20;
-                    ctx.shadowColor = nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : ENGINE_CONFIG.COLORS.YELLOW;
-                    ctx.fillStyle = nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : ENGINE_CONFIG.COLORS.YELLOW;
-                    ctx.fillRect(px + w * 0.2, py + h - 5, w * 0.2, flameLen + flicker);
-                    ctx.fillRect(px + w * 0.6, py + h - 5, w * 0.2, flameLen + flicker);
+            // Headlights / Taillights
+            if (cfg.isPlayer) {
+                ctx.fillStyle = '#fff'; ctx.shadowBlur = 15; ctx.shadowColor = '#fff';
+                ctx.fillRect(-cfg.w / 2 + 5, -cfg.h / 2 - 5, 15, 6); ctx.fillRect(cfg.w / 2 - 20, -cfg.h / 2 - 5, 15, 6);
+                
+                // Animated Exhaust Flames
+                if (this.player.speed > 100) {
+                    const flameLen = (this.player.speed / 1000) * 80 * (this.player.nitroActive ? 2 : 1);
+                    const flick = Math.random() * 15;
+                    ctx.shadowBlur = 20; ctx.shadowColor = this.player.nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : ENGINE_CONFIG.COLORS.YELLOW;
+                    ctx.fillStyle = this.player.nitroActive ? ENGINE_CONFIG.COLORS.MAGENTA : ENGINE_CONFIG.COLORS.YELLOW;
+                    ctx.fillRect(-cfg.w / 2 + cfg.w * 0.2, cfg.h / 2 - 5, cfg.w * 0.2, flameLen + flick);
+                    ctx.fillRect(-cfg.w / 2 + cfg.w * 0.6, cfg.h / 2 - 5, cfg.w * 0.2, flameLen + flick);
                 }
             } else {
-                // Tail lights
                 ctx.fillStyle = ENGINE_CONFIG.COLORS.RED;
-                ctx.fillRect(px + 5, py + h - 2, 12, 5);
-                ctx.fillRect(px + w - 17, py + h - 2, 12, 5);
+                ctx.fillRect(-cfg.w / 2 + 5, cfg.h / 2 - 2, 12, 5); ctx.fillRect(cfg.w / 2 - 17, cfg.h / 2 - 2, 12, 5);
             }
 
             ctx.restore();
         }
 
         // ==========================
-        // 4. INPUT HANDLING
+        // UTILITIES
         // ==========================
-        setupInput() {
-            window.addEventListener('keydown', e => {
-                if (e.code === 'KeyP' || e.code === 'Escape') this.togglePause();
-                if (e.code === 'Enter' || e.code === 'NumpadEnter') {
-                    if (this.state === STATE.START || this.state === STATE.GAMEOVER) this.start();
-                }
-            });
+        loadHighScore() { return parseInt(localStorage.getItem('neoDrive_highScore')) || 0; }
+        saveHighScore(s) { if (s > this.highScore) { this.highScore = Math.floor(s); localStorage.setItem('neoDrive_highScore', this.highScore); } }
+        getDifficulty() { return Math.min(1.0, this.score / ENGINE_CONFIG.DIFFICULTY.MAX_INTENSITY_SCORE); }
+
+        /**
+         * Main Game Loop
+         * Synchronizes updates and rendering with the screen refresh rate.
+         */
+        loop(timestamp) {
+            const dt = Math.min((timestamp - (this.lastTime || timestamp)) / 1000, 0.1);
+            this.lastTime = timestamp;
+            this.update(dt);
+            this.particles.update(dt);
+            this.render();
+            requestAnimationFrame(t => this.loop(t));
         }
     }
 
+    // Launch the system once the page is fully loaded.
     if (document.readyState === 'complete') new GameController();
     else window.addEventListener('load', () => new GameController());
 })();
