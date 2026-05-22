@@ -33,6 +33,17 @@
         get ROAD_MARGIN() { return (VIEW.WIDTH - (this.LANE_COUNT * this.LANE_WIDTH)) / 2; }
     };
 
+    const DIFFICULTY_CONFIG = {
+        MAX_INTENSITY_SCORE: 100000,
+        SPEED_SCALING_FACTOR: 1.5,
+        SPAWN_INTERVAL: { MAX: 900, MIN: 500 },
+        LANE_SWITCH: {
+            INTENSITY_THRESHOLD: 0.5,
+            CHANCE: 0.5,      // Chance per second
+            COOLDOWN: 2.0     // Seconds between switches
+        }
+    };
+
     const PLAYER_CONFIG = {
         WIDTH: 70,
         HEIGHT: 110,
@@ -316,21 +327,53 @@
         reset() {
             this.lane = Math.floor(Math.random() * CONFIG.LANE_COUNT);
             this.logicalY = -250;
+            this.x = undefined; // Will be initialized on first update or spawn
             this.speed = 120 + Math.random() * 180;
             this.color = TRAFFIC_CONFIG.COLORS[Math.floor(Math.random() * 4)];
             this.active = false;
             this.missed = false;
+            this.switchCooldown = 0;
         }
         spawn() {
             this.lane = Math.floor(Math.random() * CONFIG.LANE_COUNT);
             this.logicalY = -250;
             this.active = true;
             this.missed = false;
+            this.switchCooldown = Math.random() * 2; // Random initial cooldown
+            const marginX = CONFIG.ROAD_MARGIN;
+            this.x = marginX + this.lane * CONFIG.LANE_WIDTH + CONFIG.LANE_WIDTH / 2;
         }
-        update(dt, playerSpeed, difficulty) {
+        update(dt, playerSpeed, difficulty, playerX) {
             if (!this.active) return;
-            const difficultyMultiplier = 1 + (difficulty * 0.5); // Up to 1.5x speed
+            
+            // Y Movement
+            const difficultyMultiplier = 1 + (difficulty * (DIFFICULTY_CONFIG.SPEED_SCALING_FACTOR - 1));
             this.logicalY += (playerSpeed - (this.speed * difficultyMultiplier)) * dt;
+            
+            // X Movement (Smoothing)
+            const marginX = CONFIG.ROAD_MARGIN;
+            const targetX = marginX + this.lane * CONFIG.LANE_WIDTH + CONFIG.LANE_WIDTH / 2;
+            if (this.x === undefined) this.x = targetX;
+            this.x = lerp(this.x, targetX, dt * 5);
+
+            // Lane Switching Logic
+            if (difficulty > DIFFICULTY_CONFIG.LANE_SWITCH.INTENSITY_THRESHOLD) {
+                this.switchCooldown -= dt;
+                if (this.switchCooldown <= 0 && this.logicalY < 800 && this.logicalY > -200) {
+                    if (Math.random() < DIFFICULTY_CONFIG.LANE_SWITCH.CHANCE * dt) {
+                        const playerLane = Math.floor((playerX - marginX) / CONFIG.LANE_WIDTH);
+                        if (playerLane !== this.lane) {
+                            const dir = playerLane > this.lane ? 1 : -1;
+                            const newLane = this.lane + dir;
+                            if (newLane >= 0 && newLane < CONFIG.LANE_COUNT) {
+                                this.lane = newLane;
+                                this.switchCooldown = DIFFICULTY_CONFIG.LANE_SWITCH.COOLDOWN;
+                            }
+                        }
+                    }
+                }
+            }
+
             if (this.logicalY > 1200 || this.logicalY < -600) this.active = false;
         }
     }
@@ -378,7 +421,7 @@
         }
 
         getDifficulty() {
-            return Math.min(1.0, this.score / 100000);
+            return Math.min(1.0, this.score / DIFFICULTY_CONFIG.MAX_INTENSITY_SCORE);
         }
 
         init() {
@@ -448,6 +491,8 @@
             if (this.hitstop > 0) { this.hitstop -= dt * 1000; return; }
             if (this.state !== STATE.PLAYING) return;
 
+            const difficulty = this.getDifficulty();
+
             let isMoving = (this.input.isPressed('KeyW') || this.input.isPressed('ArrowUp'));
             let isBraking = (this.input.isPressed('KeyS') || this.input.isPressed('ArrowDown'));
             if (!isMoving && ('ontouchstart' in window) && window.innerWidth < 1024) isMoving = true;
@@ -462,13 +507,15 @@
 
             const PHYSICS_STEP = 1 / 120;
             let remaining = dt;
+            const maxSpeed = PLAYER_CONFIG.MAX_SPEED * (1 + difficulty * (DIFFICULTY_CONFIG.SPEED_SCALING_FACTOR - 1));
+
             while (remaining > 0) {
                 const step = Math.min(remaining, PHYSICS_STEP);
                 if (isBraking) {
                     this.player.speed = Math.max(0, this.player.speed - PLAYER_CONFIG.BRAKE_FORCE * step);
                 } else if (isMoving) {
                     const accel = this.player.nitroActive ? PLAYER_CONFIG.NITRO_ACCEL : PLAYER_CONFIG.ACCEL;
-                    this.player.speed = Math.min(this.player.speed + accel * step, PLAYER_CONFIG.MAX_SPEED);
+                    this.player.speed = Math.min(this.player.speed + accel * step, maxSpeed);
                 } else {
                     this.player.speed = Math.max(0, this.player.speed - PLAYER_CONFIG.FRICTION * step);
                 }
@@ -484,16 +531,14 @@
 
             this.offset += this.player.speed * dt;
 
-            const difficulty = this.getDifficulty();
-
             // Scale spawn timer
             this.spawnTimer += dt * 1000;
-            const spawnInterval = 900 - (difficulty * 400); // Ramps from 900ms to 500ms
+            const spawnInterval = DIFFICULTY_CONFIG.SPAWN_INTERVAL.MAX - (difficulty * (DIFFICULTY_CONFIG.SPAWN_INTERVAL.MAX - DIFFICULTY_CONFIG.SPAWN_INTERVAL.MIN));
             if (this.spawnTimer > spawnInterval) {
                 const car = this.trafficPool.find(c => !c.active);
                 if (car) { car.spawn(); this.spawnTimer = 0; }
             }
-            this.trafficPool.forEach(c => c.update(dt, this.player.speed, difficulty));
+            this.trafficPool.forEach(c => c.update(dt, this.player.speed, difficulty, this.player.x));
 
             if (this.player.speed > 10) this.score += (this.player.speed * dt) / 10;
             this.checkCollisions();
@@ -594,8 +639,7 @@
 
         drawCarBody(car, isPlayer = false) {
             const { ctx } = this;
-            const marginX = CONFIG.ROAD_MARGIN;
-            const lx = isPlayer ? this.player.x : (marginX + car.lane * CONFIG.LANE_WIDTH + CONFIG.LANE_WIDTH / 2);
+            const lx = isPlayer ? this.player.x : car.x;
             const ly = isPlayer ? PLAYER_CONFIG.Y_POS : car.logicalY;
             const w = isPlayer ? PLAYER_CONFIG.WIDTH : TRAFFIC_CONFIG.WIDTH;
             const h = isPlayer ? PLAYER_CONFIG.HEIGHT : TRAFFIC_CONFIG.HEIGHT;
