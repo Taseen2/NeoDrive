@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neo Drive Simulation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- BACKGROUND -->
+    <div id="desktop-bg">
+        <div class="cyber-grid"></div>
+        <div class="ambient-light left"></div>
+        <div class="ambient-light right"></div>
+        <div class="vignette"></div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div id="app-wrapper">
+        <!-- PUTTING OVERLAYS BACK OUTSIDE CONTAINER FOR DIRECT SELECTABILITY -->
+        <div class="scanlines"></div>
+        <div id="flash-overlay"></div>
+
+        <div id="game-container">
+            <!-- THE CANVAS: RESTORED TO PRIMARY POSITION -->
+            <canvas id="gameCanvas" width="800" height="1000" aria-label="NeoDrive racing game canvas"></canvas>
+            
+            <!-- HUD OVERLAY -->
+            <div id="hud-overlay" class="hidden">
+                <div class="hud-top">
+                    <div class="stat-box">
+                        <span class="label">SYS_SCORE</span>
+                        <span id="score-val" class="value text-cyan">000000</span>
+                    </div>
+                    <div id="combo-container" class="stat-box hidden">
+                        <span class="label">COMBO_MULTIPLIER</span>
+                        <span id="combo-val" class="value text-magenta">x1</span>
+                    </div>
+                    <!-- PAUSE BUTTON -->
+                    <button id="pause-btn-hud" class="pause-trigger" title="Pause Game">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                            <rect x="6" y="4" width="4" height="16" />
+                            <rect x="14" y="4" width="4" height="16" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="hud-bottom">
+                    <div class="module speed-module-new">
+                        <div class="gauge-wrapper">
+                            <svg class="speed-gauge-svg" viewBox="0 0 120 120">
+                                <circle class="gauge-track" cx="60" cy="60" r="54" />
+                                <circle id="speed-gauge-fill" class="gauge-fill-arc" cx="60" cy="60" r="54" />
+                                <path class="redline-arc" d="M 98 98 A 54 54 0 0 0 114 60" />
+                            </svg>
+                            <div class="gauge-center">
+                                <span id="speed-num">0</span>
+                                <span class="unit">KM/H</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="module nitro-module">
+                        <div class="val-row label-row">
+                            <span class="label">N2O_CORE</span>
+                            <span id="nitro-status" class="status-ready hidden">READY</span>
+                        </div>
+                        <div class="bar-bg"><div id="nitro-bar" class="bar-fill magenta-bg"></div></div>
+                    </div>
+                </div>
+                
+                <!-- TOUCH CONTROLS -->
+                <div id="mobile-controls" class="hidden">
+                    <div id="touch-left" class="touch-zone"></div>
+                    <div id="touch-right" class="touch-zone"></div>
+                    <button id="nitro-btn" class="touch-btn-nitro">BOOST</button>
+                </div>
+
+                <div id="near-miss-pop" class="floating-text hidden">NEAR MISS +BOOST</div>
+            </div>
+
+            <!-- SCREENS -->
+            <div id="start-screen" class="screen">
+                <div class="title-container">
+                    <h1 class="glitch-text" data-text="NEO DRIVE">NEO DRIVE</h1>
+                    <p class="subtitle">SIMULATION v3.0</p>
+                </div>
+                <div class="instructions">
+                    <div class="instruction-row">
+                        <span class="key">W</span> / <span class="key">UP</span>
+                        <span class="action">ACCEL</span>
+                        <span class="key">S</span> / <span class="key">DOWN</span>
+                        <span class="action">BRAKE</span>
+                    </div>
+                    <div class="instruction-row">
+                        <span class="key">A</span> / <span class="key">LEFT</span>
+                        <span class="key">D</span> / <span class="key">RIGHT</span>
+                        <span class="action">STEER VEHICLE</span>
+                    </div>
+                    <div class="instruction-row">
+                        <span class="key">SHIFT</span>
+                        <span class="action">NITRO OVERDRIVE</span>
+                        <span class="key">P</span> / <span class="key">ESC</span>
+                        <span class="action">PAUSE</span>
+                    </div>
+                    <div class="mobile-instructions">
+                        <p class="mobile-hint">MOBILE: AUTO-ACCEL ACTIVE</p>
+                        <p class="mobile-hint">TOUCH EDGES TO STEER • USE BOOST/BRAKE BUTTONS</p>
+                    </div>
+                    <div id="high-score-start" class="high-score-display text-magenta">BEST_DRIVE: 000000</div>
+                </div>
+                <button id="start-btn" class="cyber-btn">INITIATE DRIVE SEQUENCE</button>
+            </div>
+
+            <div id="pause-screen" class="screen hidden">
+                <h1 class="glitch-text text-cyan" data-text="PAUSED">PAUSED</h1>
+                <p class="subtitle">SYSTEM STANDBY...</p>
+                <button id="resume-btn" class="cyber-btn">RESUME SEQUENCE</button>
+            </div>
+
+            <div id="game-over-screen" class="screen crash-state hidden">
+                <h1 class="glitch-text text-red" data-text="VEHICLE DESTROYED">VEHICLE DESTROYED</h1>
+                <p class="signal-lost">SIGNAL LOST...</p>
+                <div class="stats-panel">
+                    <div class="stat-row">
+                        <span class="stat-label">FINAL SCORE</span>
+                        <span id="final-score" class="stat-val text-cyan">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">BEST DRIVE</span>
+                        <span id="high-score-end" class="stat-val text-magenta">0</span>
+                    </div>
+                </div>
+                <button id="restart-btn" class="cyber-btn danger-btn">REBOOT SYSTEM</button>
+            </div>
+        </div>
+    </div>
+    <!-- ADDING BRAKE BTN TO HUD OVERLAY FOR MOBILE -->
+    <div id="mobile-only-controls" class="hidden">
+        <button id="brake-btn" class="touch-btn-brake">BRAKE</button>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,743 @@
+/* ============================================================
+   NEO DRIVE SIMULATOR - MODERN NEON THEME
+   ============================================================ */
+
+/* 1. GLOBAL VARIABLES (Custom Properties) */
+:root {
+    --cyan: #00f3ff;
+    --magenta: #bc13fe;
+    --yellow: #fffa00;
+    --red: #ff0033;
+    --bg-dark: #020205;
+    --glass: rgba(0, 0, 0, 0.25);
+    --font-heading: 'Orbitron', sans-serif;
+    --font-ui: 'Rajdhani', sans-serif;
+}
+
+/* 2. BASE STYLES */
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-dark);
+    color: white;
+    font-family: var(--font-ui);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 3. AMBIENT BACKGROUND ENVIRONMENT */
+#desktop-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background: linear-gradient(to bottom, #000, #050510);
+}
+
+.cyber-grid {
+    position: absolute;
+    bottom: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background-image:
+        linear-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 243, 255, 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    transform: perspective(500px) rotateX(60deg);
+    animation: gridMove 20s linear infinite;
+}
+
+@keyframes gridMove {
+    0% {
+        background-position: 0 0;
+    }
+
+    100% {
+        background-position: 0 1000px;
+    }
+}
+
+.ambient-light {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    filter: blur(150px);
+    opacity: 0.2;
+}
+
+.ambient-light.left {
+    top: 0;
+    left: -100px;
+    background: var(--magenta);
+}
+
+.ambient-light.right {
+    bottom: 0;
+    right: -100px;
+    background: var(--cyan);
+}
+
+.vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, transparent 40%, #000 120%);
+}
+
+/* 4. GAME VIEWPORT WRAPPER */
+#app-wrapper {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#game-container {
+    position: relative;
+    width: 800px;
+    height: 1000px;
+    aspect-ratio: 4 / 5;
+    background: #000;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 243, 255, 0.1);
+    border: 1px solid rgba(0, 243, 255, 0.1);
+    overflow: hidden;
+    z-index: 5;
+}
+
+canvas {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* 5. CINEMATIC EFFECTS LAYER */
+.scanlines,
+#flash-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.scanlines {
+    background: linear-gradient(to bottom,
+            rgba(18, 16, 16, 0) 50%,
+            rgba(0, 0, 0, 0.15) 50%);
+    background-size: 100% 4px;
+    z-index: 20;
+    opacity: 0.3;
+}
+
+#flash-overlay {
+    background: white;
+    z-index: 30;
+    opacity: 0;
+}
+
+/* 6. HUD ELEMENTS */
+#hud-overlay {
+    position: absolute;
+    inset: 0;
+    padding: 25px;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 15;
+}
+
+.hud-top {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+}
+
+.pause-trigger {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: var(--glass);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(0, 243, 255, 0.3);
+    color: var(--cyan);
+    width: 44px;
+    height: 44px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: all 0.2s;
+    z-index: 200;
+}
+
+.pause-trigger:hover {
+    background: var(--cyan);
+    color: black;
+    box-shadow: 0 0 15px var(--cyan);
+}
+
+.stat-box {
+    background: var(--glass);
+    backdrop-filter: blur(10px);
+    border-left: 3px solid var(--cyan);
+    padding: 10px 20px;
+    width: fit-content;
+}
+
+.label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 2px;
+}
+
+.value {
+    font-family: var(--font-heading);
+    font-size: 24px;
+    font-weight: 900;
+}
+
+.hud-bottom {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: flex-end;
+}
+
+.module {
+    background: var(--glass);
+    backdrop-filter: blur(10px);
+    padding: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* --- NEW CIRCULAR GAUGE STYLES --- */
+.speed-module-new {
+    background: var(--glass);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(0, 243, 255, 0.2);
+    padding: 10px;
+    width: 160px;
+    height: 160px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 4px;
+    position: relative;
+}
+
+.gauge-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.speed-gauge-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(135deg);
+}
+
+.gauge-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.05);
+    stroke-width: 8;
+    stroke-dasharray: 255;
+    stroke-dashoffset: 0;
+    stroke-linecap: round;
+}
+
+.gauge-fill-arc {
+    fill: none;
+    stroke: var(--cyan);
+    stroke-width: 8;
+    stroke-dasharray: 339;
+    stroke-dashoffset: 339;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px var(--cyan));
+    transition: stroke-dashoffset 0.1s ease-out, stroke 0.3s;
+}
+
+.redline-arc {
+    fill: none;
+    stroke: var(--red);
+    stroke-width: 4;
+    opacity: 0.3;
+    filter: drop-shadow(0 0 5px var(--red));
+}
+
+.gauge-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+}
+
+#speed-num {
+    font-family: var(--font-heading);
+    font-size: 38px;
+    font-weight: 900;
+    color: var(--cyan);
+    line-height: 1;
+    text-shadow: 0 0 15px var(--cyan);
+}
+
+.unit {
+    font-size: 10px;
+    letter-spacing: 2px;
+    opacity: 0.5;
+    margin-top: 4px;
+}
+
+/* --- NITRO STYLES --- */
+.nitro-module {
+    background: var(--glass);
+    backdrop-filter: blur(10px);
+    padding: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    align-self: flex-end;
+}
+
+.val-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.label-row {
+    margin-bottom: 8px;
+}
+
+.bar-bg {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    margin-top: 10px;
+}
+
+.bar-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.1s;
+}
+
+.cyan-bg {
+    background: var(--cyan);
+    box-shadow: 0 0 15px var(--cyan);
+}
+
+.magenta-bg {
+    background: var(--magenta);
+    box-shadow: 0 0 15px var(--magenta);
+}
+
+.status-ready {
+    font-size: 15px;
+    background: var(--magenta);
+    padding: 2px 8px;
+    border-radius: 4px;
+    animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        opacity: 0.4;
+        box-shadow: 0 0 0px var(--magenta);
+    }
+
+    to {
+        opacity: 1;
+        box-shadow: 0 0 15px var(--magenta);
+    }
+}
+
+/* 7. MENU SCREENS */
+.screen {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(20px);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px;
+    transition: opacity 0.5s ease-out;
+}
+
+h1 {
+    font-family: var(--font-heading);
+    font-size: 72px;
+    margin: 0;
+    letter-spacing: 10px;
+    font-weight: 900;
+}
+
+.subtitle {
+    letter-spacing: 5px;
+    color: var(--cyan);
+    opacity: 0.7;
+    margin-bottom: 50px;
+}
+
+.instruction-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.key {
+    background: #fff;
+    color: #000;
+    padding: 4px 8px;
+    font-weight: 700;
+    min-width: 35px;
+    font-size: 12px;
+    border-radius: 2px;
+}
+
+.action {
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-right: 10px;
+}
+
+.cyber-btn {
+    margin-top: 60px;
+    background: transparent;
+    border: 2px solid var(--cyan);
+    color: var(--cyan);
+    padding: 18px 45px;
+    font-family: var(--font-heading);
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    letter-spacing: 3px;
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+}
+
+.cyber-btn:hover {
+    background: var(--cyan);
+    color: black;
+    transform: scale(1.05);
+    box-shadow: 0 0 40px var(--cyan);
+}
+
+.cyber-btn:focus-visible {
+    outline: 3px solid white;
+    outline-offset: 4px;
+}
+
+.cyber-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+    );
+    transition: 0.5s;
+}
+
+.cyber-btn:hover::before {
+    left: 100%;
+}
+
+.danger-btn {
+    border-color: var(--red);
+    color: var(--red);
+}
+
+.danger-btn:hover {
+    background: var(--red);
+    box-shadow: 0 0 40px var(--red);
+}
+
+/* 12. RESPONSIVE ADJUSTMENTS */
+@media (max-height: 800px) {
+    h1 { font-size: 48px; }
+    .subtitle { margin-bottom: 20px; }
+    .cyber-btn { margin-top: 30px; }
+    
+    .speed-module-new {
+        width: 120px;
+        height: 120px;
+    }
+    #speed-num { font-size: 28px; }
+    .stat-box { padding: 5px 15px; }
+    .value { font-size: 18px; }
+}
+
+@media (max-width: 600px) {
+    #hud-overlay { padding: 15px; }
+    .hud-bottom { gap: 10px; }
+    .module { padding: 10px; }
+    .speed-module-new { width: 100px; height: 100px; }
+    #speed-num { font-size: 24px; }
+    .unit { font-size: 8px; }
+    .stat-box { border-left-width: 2px; }
+    
+    h1 { font-size: 36px; letter-spacing: 5px; }
+}
+
+/* 8. GLITCH ANIMATION */
+.glitch-text {
+    position: relative;
+    color: white;
+}
+
+.glitch-text::before,
+.glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.8;
+}
+
+.glitch-text::before {
+    color: var(--cyan);
+    z-index: -1;
+    animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
+}
+
+.glitch-text::after {
+    color: var(--magenta);
+    z-index: -2;
+    animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) reverse both infinite;
+}
+
+@keyframes glitch {
+    0% {
+        transform: translate(0);
+    }
+
+    20% {
+        transform: translate(-3px, 3px);
+    }
+
+    40% {
+        transform: translate(-3px, -3px);
+    }
+
+    60% {
+        transform: translate(3px, 3px);
+    }
+
+    80% {
+        transform: translate(3px, -3px);
+    }
+
+    100% {
+        transform: translate(0);
+    }
+}
+
+/* 9. CRASH STATE & FEEDBACK */
+.crash-state {
+    background: radial-gradient(circle, rgba(255, 0, 51, 0.4) 0%, #000 100%);
+}
+
+.warning-banner {
+    background: var(--red);
+    color: white;
+    width: 100%;
+    padding: 10px;
+    font-weight: 900;
+    margin-bottom: 30px;
+    animation: blink 0.2s infinite;
+}
+
+.signal-lost {
+    font-family: 'Courier New', Courier, monospace;
+    color: var(--red);
+    margin-bottom: 40px;
+}
+
+@keyframes blink {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+/* 10. MOBILE CONTROLS & FEEDBACK */
+#mobile-controls {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    z-index: 100;
+}
+
+.touch-zone {
+    flex: 1;
+    height: 100%;
+    pointer-events: auto;
+}
+
+.touch-btn-nitro {
+    position: absolute;
+    bottom: 120px;
+    right: 30px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(188, 19, 254, 0.2);
+    border: 2px solid var(--magenta);
+    color: var(--magenta);
+    font-family: var(--font-heading);
+    font-weight: 900;
+    pointer-events: auto;
+    z-index: 200;
+}
+
+.touch-btn-brake {
+    position: absolute;
+    bottom: 120px;
+    left: 30px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255, 0, 51, 0.2);
+    border: 2px solid var(--red);
+    color: var(--red);
+    font-family: var(--font-heading);
+    font-weight: 900;
+    pointer-events: auto;
+    z-index: 200;
+}
+
+.high-score-display {
+    margin-top: 20px;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: 2px;
+    font-size: 14px;
+}
+
+.stats-panel {
+    width: 100%;
+    max-width: 300px;
+    margin-bottom: 30px;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-label {
+    font-size: 12px;
+    letter-spacing: 1px;
+    opacity: 0.6;
+}
+
+.stat-val {
+    font-family: var(--font-heading);
+    font-weight: 700;
+}
+
+.mobile-instructions {
+    margin-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 15px;
+}
+
+.mobile-hint {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--yellow);
+    margin: 5px 0;
+}
+
+.floating-text {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-heading);
+    font-size: 32px;
+    font-weight: 900;
+    color: var(--yellow);
+    text-shadow: 0 0 20px var(--yellow);
+    animation: popOut 0.8s ease-out forwards;
+}
+
+@keyframes popOut {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+
+    20% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.2);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -100%) scale(1);
+    }
+}
+
+/* 11. UTILITY CLASSES */
+.text-cyan {
+    color: var(--cyan);
+    text-shadow: 0 0 15px var(--cyan);
+}
+
+.text-magenta {
+    color: var(--magenta);
+    text-shadow: 0 0 15px var(--magenta);
+}
+
+.text-red {
+    color: var(--red);
+    text-shadow: 0 0 15px var(--red);
+}
+
+.hidden {
+    display: none !important;
+}
