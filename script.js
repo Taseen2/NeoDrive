@@ -355,9 +355,9 @@
         constructor() { this.reset(); }
         reset() {
             this.lane = Math.floor(Math.random() * CONFIG.LANE_COUNT);
-            this.logicalY = -250;
+            this.logicalY = TRAFFIC_CONFIG.INITIAL_Y;
             this.x = undefined; // Will be initialized on first update or spawn
-            this.speed = 120 + Math.random() * 180;
+            this.speed = TRAFFIC_CONFIG.BASE_SPEED_MIN + Math.random() * TRAFFIC_CONFIG.BASE_SPEED_VAR;
             this.color = TRAFFIC_CONFIG.COLORS[Math.floor(Math.random() * 4)];
             this.active = false;
             this.missed = false;
@@ -365,7 +365,7 @@
         }
         spawn() {
             this.lane = Math.floor(Math.random() * CONFIG.LANE_COUNT);
-            this.logicalY = -250;
+            this.logicalY = TRAFFIC_CONFIG.INITIAL_Y;
             this.active = true;
             this.missed = false;
             this.switchCooldown = Math.random() * 2; // Random initial cooldown
@@ -383,7 +383,7 @@
             const marginX = CONFIG.ROAD_MARGIN;
             const targetX = marginX + this.lane * CONFIG.LANE_WIDTH + CONFIG.LANE_WIDTH / 2;
             if (this.x === undefined) this.x = targetX;
-            this.x = lerp(this.x, targetX, dt * 5);
+            this.x = lerp(this.x, targetX, dt * TRAFFIC_CONFIG.X_SMOOTHING);
 
             // Lane Switching Logic
             if (difficulty > DIFFICULTY_CONFIG.LANE_SWITCH.INTENSITY_THRESHOLD) {
@@ -403,7 +403,7 @@
                 }
             }
 
-            if (this.logicalY > 1200 || this.logicalY < -600) this.active = false;
+            if (this.logicalY > TRAFFIC_CONFIG.DESPAWN_Y_BOTTOM || this.logicalY < TRAFFIC_CONFIG.DESPAWN_Y_TOP) this.active = false;
         }
     }
 
