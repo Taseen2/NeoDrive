@@ -2,7 +2,8 @@
 
 A high-intensity, cyberpunk-themed 2D arcade racing simulation built with Vanilla JavaScript and Canvas API. 
 
-![NeoDrive Screenshot](docs/screenshots/main_menu.png) *(Note: Add your screenshot here!)*
+<img width="1920" height="928" alt="image" src="https://github.com/user-attachments/assets/511f1005-6433-4438-b5fb-8e4d00df5edd" />
+
 
 ## 🌟 Key Features
 
@@ -48,5 +49,3 @@ The project follows a clean, modular architecture inspired by senior-level engin
 3. Initiate drive sequence.
 
 ---
-
-*Developed with passion for the cyberpunk aesthetic and high-performance web engineering.*
