@@ -327,9 +327,10 @@
             this.active = true;
             this.missed = false;
         }
-        update(dt, playerSpeed) {
+        update(dt, playerSpeed, difficulty) {
             if (!this.active) return;
-            this.logicalY += (playerSpeed - this.speed) * dt;
+            const difficultyMultiplier = 1 + (difficulty * 0.5); // Up to 1.5x speed
+            this.logicalY += (playerSpeed - (this.speed * difficultyMultiplier)) * dt;
             if (this.logicalY > 1200 || this.logicalY < -600) this.active = false;
         }
     }
@@ -374,6 +375,10 @@
                 this.highScore = Math.floor(s);
                 localStorage.setItem('neoDrive_highScore', this.highScore);
             }
+        }
+
+        getDifficulty() {
+            return Math.min(1.0, this.score / 100000);
         }
 
         init() {
@@ -479,12 +484,16 @@
 
             this.offset += this.player.speed * dt;
 
+            const difficulty = this.getDifficulty();
+
+            // Scale spawn timer
             this.spawnTimer += dt * 1000;
-            if (this.spawnTimer > 900) {
+            const spawnInterval = 900 - (difficulty * 400); // Ramps from 900ms to 500ms
+            if (this.spawnTimer > spawnInterval) {
                 const car = this.trafficPool.find(c => !c.active);
                 if (car) { car.spawn(); this.spawnTimer = 0; }
             }
-            this.trafficPool.forEach(c => c.update(dt, this.player.speed));
+            this.trafficPool.forEach(c => c.update(dt, this.player.speed, difficulty));
 
             if (this.player.speed > 10) this.score += (this.player.speed * dt) / 10;
             this.checkCollisions();
