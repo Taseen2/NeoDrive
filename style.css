@@ -9,12 +9,32 @@
     --yellow: #fffa00;
     --red: #ff0033;
     --bg-dark: #020205;
+    
     --glass: rgba(0, 0, 0, 0.25);
+    --glass-heavy: rgba(0, 0, 0, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --cyan-border: rgba(0, 243, 255, 0.3);
+    
+    --cyan-glow: 0 0 15px var(--cyan);
+    --magenta-glow: 0 0 15px var(--magenta);
+    --red-glow: 0 0 15px var(--red);
+    --cyan-glow-intense: 0 0 30px var(--cyan);
+    --magenta-glow-intense: 0 0 30px var(--magenta);
+    
     --font-heading: 'Orbitron', sans-serif;
     --font-ui: 'Rajdhani', sans-serif;
+    
+    --blur-ui: blur(10px);
+    --blur-heavy: blur(20px);
+    --blur-bg: blur(150px);
+    
+    --transition-fast: 0.1s;
+    --transition-norm: 0.2s;
+    --transition-slow: 0.4s;
+    --anim-grid: 20s;
 }
 
-/* 2. BASE STYLES */
+/* 2. BASE STYLES & UTILITIES */
 * {
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
@@ -33,6 +53,18 @@ body {
     justify-content: center;
     align-items: center;
 }
+
+.glass-panel {
+    background: var(--glass);
+    backdrop-filter: var(--blur-ui);
+    border: 1px solid var(--glass-border);
+}
+
+.text-cyan { color: var(--cyan); text-shadow: var(--cyan-glow); }
+.text-magenta { color: var(--magenta); text-shadow: var(--magenta-glow); }
+.text-red { color: var(--red); text-shadow: var(--red-glow); }
+
+.hidden { display: none !important; }
 
 /* 3. AMBIENT BACKGROUND ENVIRONMENT */
 #desktop-bg {
@@ -54,7 +86,8 @@ body {
         linear-gradient(90deg, rgba(0, 243, 255, 0.1) 1px, transparent 1px);
     background-size: 50px 50px;
     transform: perspective(500px) rotateX(60deg);
-    animation: gridMove 20s linear infinite;
+    animation: gridMove var(--anim-grid) linear infinite;
+    will-change: background-position;
 }
 
 @keyframes gridMove {
@@ -122,6 +155,7 @@ canvas {
     width: 100%;
     height: 100%;
     z-index: 1;
+    will-change: transform;
 }
 
 /* 5. CINEMATIC EFFECTS LAYER */
@@ -174,7 +208,7 @@ canvas {
     right: 0;
     background: var(--glass);
     backdrop-filter: blur(5px);
-    border: 1px solid rgba(0, 243, 255, 0.3);
+    border: 1px solid var(--cyan-border);
     color: var(--cyan);
     width: 44px;
     height: 44px;
@@ -183,19 +217,20 @@ canvas {
     align-items: center;
     cursor: pointer;
     pointer-events: auto;
-    transition: all 0.2s;
+    transition: all var(--transition-norm);
     z-index: 200;
 }
 
 .pause-trigger:hover {
     background: var(--cyan);
     color: black;
-    box-shadow: 0 0 15px var(--cyan);
+    box-shadow: var(--cyan-glow);
 }
 
 .stat-box {
     background: var(--glass);
-    backdrop-filter: blur(10px);
+    backdrop-filter: var(--blur-ui);
+    border: 1px solid var(--glass-border);
     border-left: 3px solid var(--cyan);
     padding: 10px 20px;
     width: fit-content;
@@ -224,16 +259,14 @@ canvas {
 
 .module {
     background: var(--glass);
-    backdrop-filter: blur(10px);
+    backdrop-filter: var(--blur-ui);
+    border: 1px solid var(--glass-border);
     padding: 15px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* --- NEW CIRCULAR GAUGE STYLES --- */
 .speed-module-new {
-    background: var(--glass);
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(0, 243, 255, 0.2);
+    border: 1px solid var(--cyan-border);
     padding: 10px;
     width: 160px;
     height: 160px;
@@ -274,7 +307,7 @@ canvas {
     stroke-linecap: round;
     filter: drop-shadow(0 0 8px var(--cyan));
     transform-origin: center;
-    transition: stroke 0.3s;
+    transition: stroke var(--transition-norm);
 }
 
 .redline-arc {
@@ -301,7 +334,7 @@ canvas {
     font-weight: 900;
     color: var(--cyan);
     line-height: 1;
-    text-shadow: 0 0 15px var(--cyan);
+    text-shadow: var(--cyan-glow);
     font-variant-numeric: tabular-nums;
 }
 
@@ -314,10 +347,6 @@ canvas {
 
 /* --- NITRO STYLES --- */
 .nitro-module {
-    background: var(--glass);
-    backdrop-filter: blur(10px);
-    padding: 15px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
     align-self: flex-end;
 }
 
@@ -341,17 +370,18 @@ canvas {
 .bar-fill {
     height: 100%;
     width: 0%;
-    transition: width 0.1s;
+    transition: width var(--transition-fast);
+    will-change: width;
 }
 
 .cyan-bg {
     background: var(--cyan);
-    box-shadow: 0 0 15px var(--cyan);
+    box-shadow: var(--cyan-glow);
 }
 
 .magenta-bg {
     background: var(--magenta);
-    box-shadow: 0 0 15px var(--magenta);
+    box-shadow: var(--magenta-glow);
 }
 
 .status-ready {
@@ -364,7 +394,7 @@ canvas {
 
 @keyframes nitroReadyPulse {
     from { opacity: 0.6; transform: scale(1); box-shadow: 0 0 5px var(--magenta); }
-    to { opacity: 1; transform: scale(1.1); box-shadow: 0 0 20px var(--magenta); }
+    to { opacity: 1; transform: scale(1.1); box-shadow: var(--magenta-glow-intense); }
 }
 
 /* --- NITRO ACTIVE SCREEN EFFECTS --- */
@@ -394,15 +424,15 @@ canvas {
 .screen {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(20px);
+    background: var(--glass-heavy);
+    backdrop-filter: var(--blur-heavy);
     z-index: 100;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     text-align: center;
-    transition: opacity 0.4s ease, visibility 0.4s;
+    transition: opacity var(--transition-slow) ease, visibility var(--transition-slow);
 }
 
 .menu-content {
@@ -501,7 +531,7 @@ h1 {
     font-family: var(--font-heading);
     font-weight: 900;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all var(--transition-norm) cubic-bezier(0.16, 1, 0.3, 1);
     letter-spacing: 4px;
     position: relative;
     overflow: hidden;
@@ -513,8 +543,19 @@ h1 {
 .cyber-btn:hover {
     background: var(--cyan);
     color: black;
-    box-shadow: 0 0 50px var(--cyan);
+    box-shadow: var(--cyan-glow-intense);
     transform: scale(1.05);
+}
+
+.danger-btn {
+    border-color: var(--red);
+    color: var(--red);
+}
+
+.danger-btn:hover {
+    background: var(--red);
+    color: white;
+    box-shadow: var(--red-glow);
 }
 
 .main-action {
@@ -524,7 +565,7 @@ h1 {
 
 @keyframes btnPulse {
     0% { box-shadow: 0 0 10px var(--cyan); }
-    50% { box-shadow: 0 0 30px var(--cyan); }
+    50% { box-shadow: var(--cyan-glow-intense); }
     100% { box-shadow: 0 0 10px var(--cyan); }
 }
 
@@ -538,7 +579,8 @@ h1 {
 
 .stat-module {
     background: var(--glass);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: var(--blur-ui);
+    border: 1px solid var(--glass-border);
     padding: 15px 30px;
     display: flex;
     flex-direction: column;
@@ -784,24 +826,4 @@ h1 {
         opacity: 0;
         transform: translate(-50%, -100%) scale(1);
     }
-}
-
-/* 11. UTILITY CLASSES */
-.text-cyan {
-    color: var(--cyan);
-    text-shadow: 0 0 15px var(--cyan);
-}
-
-.text-magenta {
-    color: var(--magenta);
-    text-shadow: 0 0 15px var(--magenta);
-}
-
-.text-red {
-    color: var(--red);
-    text-shadow: 0 0 15px var(--red);
-}
-
-.hidden {
-    display: none !important;
 }

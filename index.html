@@ -11,7 +11,7 @@
 </head>
 <body>
     <!-- BACKGROUND -->
-    <div id="desktop-bg">
+    <div id="desktop-bg" aria-hidden="true">
         <div class="cyber-grid"></div>
         <div class="ambient-light left"></div>
         <div class="ambient-light right"></div>
@@ -19,7 +19,7 @@
     </div>
 
     <!-- MAIN APP WRAPPER -->
-    <div id="app-wrapper">
+    <main id="app-wrapper">
         <!-- PUTTING OVERLAYS BACK OUTSIDE CONTAINER FOR DIRECT SELECTABILITY -->
         <div class="scanlines"></div>
         <div id="flash-overlay"></div>
@@ -30,7 +30,7 @@
             
             <!-- HUD OVERLAY -->
             <div id="hud-overlay" class="hidden">
-                <div class="hud-top">
+                <header class="hud-top">
                     <div class="stat-box">
                         <span class="label">SYS_SCORE</span>
                         <span id="score-val" class="value text-cyan">000000</span>
@@ -46,9 +46,9 @@
                             <rect x="14" y="4" width="4" height="16" />
                         </svg>
                     </button>
-                </div>
+                </header>
 
-                <div class="hud-bottom">
+                <footer class="hud-bottom">
                     <div class="module speed-module-new">
                         <div class="gauge-wrapper">
                             <svg class="speed-gauge-svg" viewBox="0 0 120 120">
@@ -70,7 +70,7 @@
                         </div>
                         <div class="bar-bg"><div id="nitro-bar" class="bar-fill magenta-bg"></div></div>
                     </div>
-                </div>
+                </footer>
                 
                 <!-- TOUCH CONTROLS -->
                 <div id="mobile-controls" class="hidden">
@@ -83,7 +83,7 @@
             </div>
 
             <!-- SCREENS -->
-            <div id="start-screen" class="screen">
+            <section id="start-screen" class="screen">
                 <div class="menu-content">
                     <h1 class="glitch-text" data-text="NEO DRIVE">NEO DRIVE</h1>
                     <p class="subtitle">v3.0 // NEURAL_LINK_READY</p>
@@ -127,17 +127,17 @@
                     
                     <div id="high-score-start" class="high-score-display text-magenta">BEST_DRIVE: 000000</div>
                 </div>
-            </div>
+            </section>
 
-            <div id="pause-screen" class="screen hidden">
+            <section id="pause-screen" class="screen hidden">
                 <div class="menu-content">
                     <h1 class="glitch-text text-cyan" data-text="PAUSED">PAUSED</h1>
                     <p class="subtitle">SYSTEM STANDBY...</p>
                     <button id="resume-btn" class="cyber-btn">RESUME SEQUENCE</button>
                 </div>
-            </div>
+            </section>
 
-            <div id="game-over-screen" class="screen crash-state hidden">
+            <section id="game-over-screen" class="screen crash-state hidden">
                 <div class="menu-content">
                     <div class="warning-banner">CRITICAL_SYSTEM_FAILURE</div>
                     <h1 class="glitch-text text-red" data-text="SIGNAL LOST">SIGNAL LOST</h1>
@@ -159,9 +159,9 @@
 
                     <button id="restart-btn" class="cyber-btn danger-btn">RE-INITIALIZE</button>
                 </div>
-            </div>
+            </section>
         </div>
-    </div>
+    </main>
     <!-- ADDING BRAKE BTN TO HUD OVERLAY FOR MOBILE -->
     <div id="mobile-only-controls" class="hidden">
         <button id="brake-btn" class="touch-btn-brake">BRAKE</button>
