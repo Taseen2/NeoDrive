@@ -39,10 +39,11 @@
         Y_POS: 850,
         MAX_SPEED: 1000,
         NORMAL_MAX_SPEED: 800,
-        BASE_ACCEL: 360,
-        FRICTION: 0.45,
-        NITRO_ACCEL: 450,
-        TURN_SPEED: 550,
+        ACCEL: 400,          // NEW: Linear acceleration
+        BRAKE_FORCE: 1200,   // NEW: Sharp braking
+        FRICTION: 150,       // NEW: Constant passive deceleration
+        NITRO_ACCEL: 600,    // NEW: Linear nitro boost
+        TURN_SPEED: 600,
         MAX_NITRO: 100
     };
 
@@ -206,20 +207,16 @@
                 this.cache.score = s;
             }
 
-            const absSpeed = Math.abs(speed);
-            const smoothFactor = 1 - Math.exp(-dt * 15);
-            this.displayedSpeed = lerp(this.displayedSpeed, absSpeed, smoothFactor);
-            const rs = Math.round(this.displayedSpeed);
-            
+            const rs = Math.round((speed / 1000) * 320); // Scale to 320 KM/H
             if (this.cache.speed !== rs) {
                 if (this.speedNum) this.speedNum.textContent = rs;
                 if (this.speedGaugeFill) {
                     const circumference = 339;
                     const maxArc = 255;
-                    const fillPercent = Math.min(this.displayedSpeed / maxSpeed, 1.25);
+                    const fillPercent = Math.min(speed / 800, 1.25); // Use base max speed for gauge
                     const offset = circumference - (fillPercent * maxArc);
                     this.speedGaugeFill.style.strokeDashoffset = offset;
-                    this.speedGaugeFill.style.stroke = this.displayedSpeed > maxSpeed * 0.9 ? CONFIG.COLORS.RED : CONFIG.COLORS.CYAN;
+                    this.speedGaugeFill.style.stroke = speed > 800 ? CONFIG.COLORS.RED : CONFIG.COLORS.CYAN;
                 }
                 this.cache.speed = rs;
             }
@@ -451,27 +448,27 @@
             if (!isMoving && ('ontouchstart' in window) && window.innerWidth < 1024) isMoving = true;
 
             this.player.nitroActive = false;
-            let targetAccel = isMoving ? PLAYER_CONFIG.BASE_ACCEL : 0;
-
             if ((this.input.isPressed('ShiftLeft') || this.input.isPressed('ShiftRight')) && this.nitro > 0 && isMoving) {
-                targetAccel = PLAYER_CONFIG.NITRO_ACCEL;
                 this.nitro -= 40 * dt;
                 this.player.nitroActive = true;
             } else {
                 this.nitro = Math.min(100, this.nitro + 12 * dt);
             }
 
-            if (isBraking) targetAccel = -PLAYER_CONFIG.BASE_ACCEL * 3;
-
             const PHYSICS_STEP = 1 / 120;
             let remaining = dt;
             while (remaining > 0) {
                 const step = Math.min(remaining, PHYSICS_STEP);
-                const force = targetAccel - (this.player.speed * PLAYER_CONFIG.FRICTION);
-                this.player.speed += force * step;
+                if (isBraking) {
+                    this.player.speed = Math.max(0, this.player.speed - PLAYER_CONFIG.BRAKE_FORCE * step);
+                } else if (isMoving) {
+                    const accel = this.player.nitroActive ? PLAYER_CONFIG.NITRO_ACCEL : PLAYER_CONFIG.ACCEL;
+                    this.player.speed = Math.min(this.player.speed + accel * step, PLAYER_CONFIG.MAX_SPEED);
+                } else {
+                    this.player.speed = Math.max(0, this.player.speed - PLAYER_CONFIG.FRICTION * step);
+                }
                 remaining -= step;
             }
-            this.player.speed = Math.max(0, Math.min(this.player.speed, PLAYER_CONFIG.MAX_SPEED));
 
             const turnFactor = Math.min(this.player.speed / 200, 1.0);
             if (this.input.isPressed('KeyA') || this.input.isPressed('ArrowLeft')) this.player.x -= PLAYER_CONFIG.TURN_SPEED * turnFactor * dt;
