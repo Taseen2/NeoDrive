@@ -555,23 +555,23 @@
 
             for (const c of this.trafficPool) {
                 if (!c.active) continue;
-                const cx = marginX + c.lane * CONFIG.LANE_WIDTH + CONFIG.LANE_WIDTH / 2;
+                const cx = c.x;
                 const cy = c.logicalY;
                 const dx = Math.abs(px - cx);
                 const dy = Math.abs(py - cy);
 
-                if (dx < 110 && dy < 100 && !c.missed) {
-                    if (dx >= 65) {
+                if (dx < 90 && dy < 95 && !c.missed) {
+                    if (dx >= 55) {
                         this.score += 500 * this.combo;
                         this.combo++;
                         this.ui.showNearMiss();
                         this.audio.playNearMiss();
                         c.missed = true;
-                        this.nitro = Math.min(100, this.nitro + 15);
+                        this.nitro = Math.min(100, this.nitro + 20);
                     }
                 }
 
-                if (dx < 65 && dy < 85) {
+                if (dx < 50 && dy < 80) {
                     this.ui.triggerFlash();
                     this.audio.playCrash();
                     this.hitstop = 300;
