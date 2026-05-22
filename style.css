@@ -106,8 +106,8 @@ body {
 
 #game-container {
     position: relative;
-    width: 800px;
-    height: 1000px;
+    width: 1200px;
+    height: 1500px;
     aspect-ratio: 4 / 5;
     background: #000;
     box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 243, 255, 0.1);
@@ -357,7 +357,23 @@ canvas {
     background: var(--magenta);
     padding: 2px 8px;
     border-radius: 4px;
-    animation: pulse 1s infinite alternate;
+    animation: nitroReadyPulse 0.5s infinite alternate;
+}
+
+@keyframes nitroReadyPulse {
+    from { opacity: 0.6; transform: scale(1); box-shadow: 0 0 5px var(--magenta); }
+    to { opacity: 1; transform: scale(1.1); box-shadow: 0 0 20px var(--magenta); }
+}
+
+/* --- NITRO ACTIVE SCREEN EFFECTS --- */
+.nitro-active {
+    animation: chromaticAberration 0.1s infinite;
+}
+
+@keyframes chromaticAberration {
+    0% { filter: drop-shadow(2px 0px 0px rgba(255,0,255,0.5)) drop-shadow(-2px 0px 0px rgba(0,255,255,0.5)); }
+    50% { filter: drop-shadow(-1px 1px 0px rgba(255,0,255,0.5)) drop-shadow(1px -1px 0px rgba(0,255,255,0.5)); }
+    100% { filter: drop-shadow(1px 0px 0px rgba(255,0,255,0.5)) drop-shadow(-1px 0px 0px rgba(0,255,255,0.5)); }
 }
 
 @keyframes pulse {

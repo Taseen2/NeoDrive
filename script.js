@@ -14,13 +14,13 @@
     const STATE = { START: 'START', PLAYING: 'PLAYING', PAUSED: 'PAUSED', GAMEOVER: 'GAMEOVER' };
 
     const VIEW = {
-        WIDTH: 1000,
+        WIDTH: 1200,
         HEIGHT: 1500 // Matches CSS 4:5 aspect ratio
     };
 
     const CONFIG = {
         LANE_COUNT: 4,
-        LANE_WIDTH: 150,
+        LANE_WIDTH: 250,
         ROAD_COLOR: '#080808',
         GRID_COLOR: 'rgba(0, 243, 255, 0.15)',
         PHYSICS_STEP: 1 / 120,
@@ -113,10 +113,10 @@
         Y_POS: 850,
         MAX_SPEED: 1000,
         NORMAL_MAX_SPEED: 800,
-        ACCEL: 400,          // NEW: Linear acceleration
-        BRAKE_FORCE: 1200,   // NEW: Sharp braking
-        FRICTION: 150,       // NEW: Constant passive deceleration
-        NITRO_ACCEL: 600,    // NEW: Linear nitro boost
+        ACCEL: 400,
+        BRAKE_FORCE: 1200,
+        FRICTION: 150,
+        NITRO_ACCEL: 600,
         NITRO_CONSUMPTION: 40,
         NITRO_REGEN: 12,
         TURN_SPEED: 600,
@@ -284,15 +284,18 @@
             this.flashOverlay = document.getElementById('flash-overlay');
 
             this.cache = { score: -1, combo: -1, speed: -1, nitro: -1, nitroReady: false };
-            this.displayedSpeed = 0;
         }
 
-        update(speed, nitro, score, combo, maxSpeed, dt) {
+        update(speed, nitro, score, combo, maxSpeed, dt, isNitroActive) {
             const s = Math.floor(score);
             if (this.cache.score !== s) {
                 if (this.scoreVal) this.scoreVal.textContent = s.toString().padStart(6, '0');
                 this.cache.score = s;
             }
+
+            // Nitro active screen effect
+            const container = document.getElementById('game-container');
+            if (container) container.classList.toggle('nitro-active', !!isNitroActive);
 
             const rs = Math.round((speed / 1000) * CONFIG.GAUGE.DISPLAY_MAX_SPEED);
             if (this.cache.speed !== rs) {
@@ -344,18 +347,18 @@
             const mobileOnly = document.getElementById('mobile-only-controls');
 
             if (state === STATE.START) {
-                this.screens.start.classList.remove('hidden');
+                if (this.screens.start) this.screens.start.classList.remove('hidden');
                 if (this.highScoreStart) this.highScoreStart.textContent = `BEST_DRIVE: ${data.highScore.toString().padStart(6, '0')}`;
             } else if (state === STATE.PLAYING) {
-                this.screens.hud.classList.remove('hidden');
+                if (this.screens.hud) this.screens.hud.classList.remove('hidden');
                 const isTouch = 'ontouchstart' in window;
                 if (isTouch && mobileControls) mobileControls.classList.remove('hidden');
                 if (isTouch && mobileOnly) mobileOnly.classList.remove('hidden');
             } else if (state === STATE.PAUSED) {
-                this.screens.hud.classList.remove('hidden');
-                this.screens.pause.classList.remove('hidden');
+                if (this.screens.hud) this.screens.hud.classList.remove('hidden');
+                if (this.screens.pause) this.screens.pause.classList.remove('hidden');
             } else if (state === STATE.GAMEOVER) {
-                this.screens.gameOver.classList.remove('hidden');
+                if (this.screens.gameOver) this.screens.gameOver.classList.remove('hidden');
                 if (document.getElementById('final-score')) document.getElementById('final-score').textContent = Math.floor(data.score).toString().padStart(6, '0');
                 if (this.highScoreEnd) this.highScoreEnd.textContent = data.highScore.toString().padStart(6, '0');
                 if (mobileControls) mobileControls.classList.add('hidden');
@@ -403,7 +406,7 @@
         reset() {
             this.lane = Math.floor(Math.random() * CONFIG.LANE_COUNT);
             this.logicalY = TRAFFIC_CONFIG.INITIAL_Y;
-            this.x = undefined; // Will be initialized on first update or spawn
+            this.x = undefined;
             this.speed = TRAFFIC_CONFIG.BASE_SPEED_MIN + Math.random() * TRAFFIC_CONFIG.BASE_SPEED_VAR;
             this.color = TRAFFIC_CONFIG.COLORS[Math.floor(Math.random() * TRAFFIC_CONFIG.COLORS.length)];
             this.active = false;
@@ -415,24 +418,19 @@
             this.logicalY = TRAFFIC_CONFIG.INITIAL_Y;
             this.active = true;
             this.missed = false;
-            this.switchCooldown = Math.random() * 2; // Random initial cooldown
+            this.switchCooldown = Math.random() * 2;
             const marginX = CONFIG.ROAD_MARGIN;
             this.x = marginX + this.lane * CONFIG.LANE_WIDTH + CONFIG.LANE_WIDTH / 2;
         }
         update(dt, playerSpeed, difficulty, playerX) {
             if (!this.active) return;
-            
-            // Y Movement
             const difficultyMultiplier = 1 + (difficulty * (DIFFICULTY_CONFIG.SPEED_SCALING_FACTOR - 1));
             this.logicalY += (playerSpeed - (this.speed * difficultyMultiplier)) * dt;
-            
-            // X Movement (Smoothing)
             const marginX = CONFIG.ROAD_MARGIN;
             const targetX = marginX + this.lane * CONFIG.LANE_WIDTH + CONFIG.LANE_WIDTH / 2;
             if (this.x === undefined) this.x = targetX;
             this.x = lerp(this.x, targetX, dt * TRAFFIC_CONFIG.X_SMOOTHING);
 
-            // Lane Switching Logic
             if (difficulty > DIFFICULTY_CONFIG.LANE_SWITCH.INTENSITY_THRESHOLD) {
                 this.switchCooldown -= dt;
                 if (this.switchCooldown <= 0 && this.logicalY < DIFFICULTY_CONFIG.LANE_SWITCH.ACTIVE_RANGE.MAX && this.logicalY > DIFFICULTY_CONFIG.LANE_SWITCH.ACTIVE_RANGE.MIN) {
@@ -462,6 +460,7 @@
     class GameController {
         constructor() {
             this.canvas = document.getElementById('gameCanvas');
+            if (!this.canvas) return;
             this.ctx = this.canvas.getContext('2d');
             this.ui = new UIHandler();
             this.audio = new AudioEngine();
@@ -477,8 +476,10 @@
             this.nitro = PLAYER_CONFIG.MAX_NITRO;
             this.crashTimer = null;
             this.highScore = this.loadHighScore();
+            this.cameraScale = 1.0;
+            this.lastTime = 0;
 
-            this.player = { x: VIEW.WIDTH / 2, speed: 0, nitroActive: false };
+            this.player = { x: VIEW.WIDTH / 2, speed: 0, nitroActive: false, trail: [] };
             this.trafficPool = Array.from({ length: TRAFFIC_CONFIG.POOL_SIZE }, () => new TrafficCar());
             this.spawnTimer = 0;
 
@@ -519,13 +520,20 @@
             window.addEventListener('resize', resize);
             resize();
 
-            document.getElementById('start-btn').addEventListener('click', () => this.start());
-            document.getElementById('restart-btn').addEventListener('click', () => this.start());
-            document.getElementById('pause-btn-hud').addEventListener('click', () => this.togglePause());
-            document.getElementById('resume-btn').addEventListener('click', () => this.togglePause());
+            const startBtn = document.getElementById('start-btn');
+            if (startBtn) startBtn.addEventListener('click', () => this.start());
+            const restartBtn = document.getElementById('restart-btn');
+            if (restartBtn) restartBtn.addEventListener('click', () => this.start());
+            const pauseBtnHud = document.getElementById('pause-btn-hud');
+            if (pauseBtnHud) pauseBtnHud.addEventListener('click', () => this.togglePause());
+            const resumeBtn = document.getElementById('resume-btn');
+            if (resumeBtn) resumeBtn.addEventListener('click', () => this.togglePause());
 
             window.addEventListener('keydown', e => {
                 if (e.code === 'KeyP' || e.code === 'Escape') this.togglePause();
+                if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+                    if (this.state === STATE.START || this.state === STATE.GAMEOVER) this.start();
+                }
             });
             
             this.ui.switchState(STATE.START, { highScore: this.highScore });
@@ -552,12 +560,14 @@
             this.player.x = VIEW.WIDTH / 2;
             this.player.speed = 0;
             this.player.nitroActive = false;
+            this.player.trail = [];
             this.trafficPool.forEach(c => c.active = false);
             this.particles.particles = [];
             this.offset = 0;
             this.shake = 0;
             this.hitstop = 0;
             this.spawnTimer = 0;
+            this.cameraScale = 1.0;
             this.ui.switchState(STATE.PLAYING);
             this.audio.init();
         }
@@ -568,7 +578,6 @@
             if (this.state !== STATE.PLAYING) return;
 
             const difficulty = this.getDifficulty();
-
             let isMoving = (this.input.isPressed('KeyW') || this.input.isPressed('ArrowUp'));
             let isBraking = (this.input.isPressed('KeyS') || this.input.isPressed('ArrowDown'));
             if (!isMoving && ('ontouchstart' in window) && window.innerWidth < 1024) isMoving = true;
@@ -577,7 +586,7 @@
             if ((this.input.isPressed('ShiftLeft') || this.input.isPressed('ShiftRight')) && this.nitro > 0 && isMoving) {
                 this.nitro -= PLAYER_CONFIG.NITRO_CONSUMPTION * dt;
                 this.player.nitroActive = true;
-            } else {
+            } else if (this.player.speed > 10) {
                 this.nitro = Math.min(PLAYER_CONFIG.MAX_NITRO, this.nitro + PLAYER_CONFIG.NITRO_REGEN * dt);
             }
 
@@ -604,9 +613,20 @@
             const margin = CONFIG.ROAD_MARGIN + CONFIG.ROAD_SAFETY_MARGIN;
             this.player.x = Math.max(margin, Math.min(this.player.x, VIEW.WIDTH - margin));
 
+            // Trail Logic
+            if (this.player.nitroActive) {
+                this.player.trail.push({ x: this.player.x, y: PLAYER_CONFIG.Y_POS });
+                if (this.player.trail.length > 10) this.player.trail.shift();
+            } else if (this.player.trail.length > 0) {
+                this.player.trail.shift();
+            }
+
+            // FOV Logic
+            const targetScale = this.player.nitroActive ? 0.95 : 1.0;
+            this.cameraScale = lerp(this.cameraScale, targetScale, dt * 5);
+
             this.offset += this.player.speed * dt;
 
-            // Scale spawn timer
             this.spawnTimer += dt * 1000;
             const spawnInterval = DIFFICULTY_CONFIG.SPAWN_INTERVAL.MAX - (difficulty * (DIFFICULTY_CONFIG.SPAWN_INTERVAL.MAX - DIFFICULTY_CONFIG.SPAWN_INTERVAL.MIN));
             if (this.spawnTimer > spawnInterval) {
@@ -619,21 +639,15 @@
             this.checkCollisions();
 
             this.shake = (this.player.speed / PLAYER_CONFIG.MAX_SPEED) * PLAYER_CONFIG.SHAKE.BASE + (this.player.nitroActive ? PLAYER_CONFIG.SHAKE.NITRO : 0);
-            this.ui.update(this.player.speed, this.nitro, this.score, this.combo, PLAYER_CONFIG.NORMAL_MAX_SPEED, dt);
+            this.ui.update(this.player.speed, this.nitro, this.score, this.combo, PLAYER_CONFIG.NORMAL_MAX_SPEED, dt, this.player.nitroActive);
             this.audio.update(this.player.speed / PLAYER_CONFIG.MAX_SPEED, this.player.nitroActive);
         }
 
         checkCollisions() {
-            const px = this.player.x;
-            const py = PLAYER_CONFIG.Y_POS;
-            const marginX = CONFIG.ROAD_MARGIN;
-
+            const px = this.player.x, py = PLAYER_CONFIG.Y_POS;
             for (const c of this.trafficPool) {
                 if (!c.active) continue;
-                const cx = c.x;
-                const cy = c.logicalY;
-                const dx = Math.abs(px - cx);
-                const dy = Math.abs(py - cy);
+                const dx = Math.abs(px - c.x), dy = Math.abs(py - c.logicalY);
 
                 if (dx < CONFIG.COLLISION.NEAR_MISS.WIDTH && dy < CONFIG.COLLISION.NEAR_MISS.HEIGHT && !c.missed) {
                     if (dx >= CONFIG.COLLISION.NEAR_MISS.THRESHOLD) {
@@ -668,24 +682,24 @@
             ctx.clearRect(0, 0, VIEW.WIDTH, VIEW.HEIGHT);
             ctx.save();
             if (this.shake > 0) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+            if (this.cameraScale !== 1.0) {
+                const cx = VIEW.WIDTH / 2, cy = PLAYER_CONFIG.Y_POS;
+                ctx.translate(cx, cy); ctx.scale(this.cameraScale, this.cameraScale); ctx.translate(-cx, -cy);
+            }
 
-            // Road
             ctx.fillStyle = CONFIG.COLORS.ROAD_BASE;
             ctx.fillRect(0, 0, VIEW.WIDTH, VIEW.HEIGHT);
             const marginX = CONFIG.ROAD_MARGIN;
             ctx.fillStyle = CONFIG.ROAD_COLOR;
             ctx.fillRect(marginX, 0, CONFIG.LANE_COUNT * CONFIG.LANE_WIDTH, VIEW.HEIGHT);
 
-            // Grid
             ctx.strokeStyle = CONFIG.GRID_COLOR;
             ctx.lineWidth = CONFIG.GRID.LINE_WIDTH;
             for (let i = -1; i <= 10; i++) {
                 const y = (i * CONFIG.GRID.SPACING + (this.offset % CONFIG.GRID.SPACING));
-                ctx.beginPath();
-                ctx.moveTo(marginX, y); ctx.lineTo(VIEW.WIDTH - marginX, y); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(marginX, y); ctx.lineTo(VIEW.WIDTH - marginX, y); ctx.stroke();
             }
 
-            // Lanes
             for (let i = 0; i <= CONFIG.LANE_COUNT; i++) {
                 const x = marginX + i * CONFIG.LANE_WIDTH;
                 ctx.beginPath();
@@ -694,16 +708,22 @@
                 ctx.moveTo(x, 0); ctx.lineTo(x, VIEW.HEIGHT); ctx.stroke();
             }
 
-            // Nitro Speed Lines
             if (this.player.nitroActive) {
                 ctx.strokeStyle = CONFIG.COLORS.NITRO_LINE;
                 ctx.lineWidth = 2;
                 for (let i = 0; i < 20; i++) {
-                    const x = Math.random() * VIEW.WIDTH;
-                    const y = Math.random() * VIEW.HEIGHT;
-                    const len = 50 + Math.random() * 100;
+                    const x = Math.random() * VIEW.WIDTH, y = Math.random() * VIEW.HEIGHT, len = 50 + Math.random() * 100;
                     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + len); ctx.stroke();
                 }
+            }
+
+            if (this.player.trail.length > 1) {
+                ctx.save();
+                this.player.trail.forEach((pos, i) => {
+                    ctx.globalAlpha = i / this.player.trail.length * 0.3;
+                    this.drawCarBody({ x: pos.x, y: pos.y, color: CONFIG.COLORS.MAGENTA }, true, true);
+                });
+                ctx.restore();
             }
 
             this.trafficPool.forEach(c => { if (c.active) this.drawCarBody(c); });
@@ -712,38 +732,81 @@
             ctx.restore();
         }
 
-        drawCarBody(car, isPlayer = false) {
+        drawCarBody(car, isPlayer = false, isGhost = false) {
             const { ctx } = this;
-            const lx = isPlayer ? this.player.x : car.x;
-            const ly = isPlayer ? PLAYER_CONFIG.Y_POS : car.logicalY;
+            const lx = isPlayer ? (isGhost ? car.x : this.player.x) : car.x;
+            const ly = isPlayer ? (isGhost ? car.y : PLAYER_CONFIG.Y_POS) : car.logicalY;
             const w = isPlayer ? PLAYER_CONFIG.WIDTH : TRAFFIC_CONFIG.WIDTH;
             const h = isPlayer ? PLAYER_CONFIG.HEIGHT : TRAFFIC_CONFIG.HEIGHT;
-            const x = lx - w / 2;
-            const y = ly - h / 2;
+            const x = -w / 2, y = -h / 2;
 
-            ctx.fillStyle = isPlayer ? (this.player.nitroActive ? 'rgba(188, 19, 254, 0.3)' : 'rgba(0, 243, 255, 0.2)') : `${car.color}33`;
-            ctx.fillRect(x - 6, y - 6, w + 12, h + 12);
+            ctx.save();
+            ctx.translate(lx, ly);
+
+            if (isPlayer && !isGhost) {
+                ctx.rotate(this.player.tilt * Math.PI / 180);
+                
+                // 1. UNDERGLOW
+                const ugColor = this.player.nitroActive ? CONFIG.COLORS.MAGENTA : CONFIG.COLORS.CYAN;
+                const ugPulse = 15 + Math.sin(this.player.underglowPulse) * 10;
+                ctx.shadowBlur = ugPulse;
+                ctx.shadowColor = ugColor;
+                ctx.fillStyle = ugColor + '44';
+                ctx.fillRect(x - 10, y - 10, w + 20, h + 20);
+            }
+
+            if (isGhost) {
+                ctx.fillStyle = CONFIG.COLORS.MAGENTA;
+                ctx.globalAlpha = car.alpha || 0.3;
+                ctx.fillRect(x, y, w, h);
+                ctx.restore();
+                return;
+            }
+
+            // 2. CHASSIS GLOW
+            if (isPlayer) {
+                ctx.shadowBlur = VISUAL_CONFIG.PLAYER.GLOW_STRENGTH * this.player.glowIntensity;
+                ctx.shadowColor = this.player.nitroActive ? CONFIG.COLORS.MAGENTA : CONFIG.COLORS.CYAN;
+            } else {
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = car.color;
+            }
+
+            // 3. MAIN BODY
             ctx.fillStyle = isPlayer ? (this.player.nitroActive ? CONFIG.COLORS.MAGENTA : CONFIG.COLORS.PLAYER) : car.color;
             ctx.fillRect(x, y, w, h);
+            
+            // Cockpit / Detail
             ctx.fillStyle = '#000';
             ctx.fillRect(x + w * 0.15, y + h * 0.2, w * 0.7, h * 0.25);
             ctx.fillRect(x + w * 0.15, y + h * 0.6, w * 0.7, h * 0.15);
 
             if (isPlayer) {
+                // Headlights
                 ctx.fillStyle = '#fff';
-                ctx.fillRect(x + 5, y - 5, 12, 5);
-                ctx.fillRect(x + w - 17, y - 5, 12, 5);
-                if (this.player.nitroActive) {
-                    ctx.fillStyle = CONFIG.COLORS.YELLOW;
-                    const fl = 20 + Math.random() * 30;
-                    ctx.fillRect(x + w * 0.2, y + h, w * 0.2, fl);
-                    ctx.fillRect(x + w * 0.6, y + h, w * 0.2, fl);
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#fff';
+                ctx.fillRect(x + 5, y - 5, 15, 6);
+                ctx.fillRect(x + w - 20, y - 5, 15, 6);
+
+                // 4. EXHAUST FLAME ANIMATION
+                if (this.player.speed > 100) {
+                    const flameLen = (this.player.speed / 1000) * 80 * (this.player.nitroActive ? 2 : 1);
+                    const flicker = Math.random() * 15;
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = this.player.nitroActive ? CONFIG.COLORS.MAGENTA : CONFIG.COLORS.YELLOW;
+                    ctx.fillStyle = this.player.nitroActive ? CONFIG.COLORS.MAGENTA : CONFIG.COLORS.YELLOW;
+                    ctx.fillRect(x + w * 0.2, y + h - 5, w * 0.2, flameLen + flicker);
+                    ctx.fillRect(x + w * 0.6, y + h - 5, w * 0.2, flameLen + flicker);
                 }
             } else {
+                // Tail lights for traffic
                 ctx.fillStyle = CONFIG.COLORS.RED;
-                ctx.fillRect(x + 5, y + h, 12, 5);
-                ctx.fillRect(x + w - 17, y + h, 12, 5);
+                ctx.fillRect(x + 5, y + h - 2, 12, 5);
+                ctx.fillRect(x + w - 17, y + h - 2, 12, 5);
             }
+
+            ctx.restore();
         }
 
         loop(timestamp) {
